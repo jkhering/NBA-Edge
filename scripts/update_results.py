@@ -288,11 +288,11 @@ def main():
     # Fetch finalized NBA events from yesterday.
     # Use explicit UTC datetime strings so West Coast games
     # (which tip ~10:30pm ET = 3:30am UTC next day) are never missed.
-    yesterday_start_utc = datetime(
-        *map(int, yesterday.split("-")), 0, 0, 0, tzinfo=timezone.utc
+    yesterday_start_utc = (
+        datetime(*map(int, yesterday.split("-")), 5, 0, 0, tzinfo=timezone.utc)
     ).strftime("%Y-%m-%dT%H:%M:%SZ")
     today_end_utc = (
-        datetime(*map(int, yesterday.split("-")), tzinfo=timezone.utc)
+        datetime(*map(int, yesterday.split("-")), 5, 0, 0, tzinfo=timezone.utc)
         + timedelta(days=1)
     ).strftime("%Y-%m-%dT%H:%M:%SZ")
     events = fetch_all_events({
@@ -315,7 +315,7 @@ def main():
     # Use UTC datetime strings (same as main fetch) so late West Coast games
     # aren't dropped from team history due to UTC date boundary.
     three_weeks_ago_utc = (
-        datetime(*map(int, yesterday.split("-")), tzinfo=timezone.utc)
+        datetime(*map(int, yesterday.split("-")), 5, 0, 0, tzinfo=timezone.utc)
         - timedelta(days=21)
     ).strftime("%Y-%m-%dT%H:%M:%SZ")
     yesterday_end_utc = today_end_utc  # same upper bound: yesterday ET + 2 days UTC
