@@ -1,7 +1,60 @@
 {
-  "games": [],
+  "games": [
+    {
+      "event_id": "mIBtK8wmc0k1knQypi1P",
+      "date": "2026-03-04",
+      "starts_at": "2026-03-05T00:00:00.000Z",
+      "matchup": "OKC @ NYK",
+      "away": "OKC",
+      "home": "NYK",
+      "away_score": 103,
+      "home_score": 100,
+      "away_fatigue": 7.5,
+      "home_fatigue": 6.0,
+      "away_scenario": "A",
+      "home_scenario": "C",
+      "away_detail": "BTB road trip \u00b7 714mi",
+      "home_detail": "BTB away\u2192home \u00b7 340mi",
+      "fatigue_diff": 1.5,
+      "edge": "HOME",
+      "flagged_team": "OKC",
+      "both_tired": true,
+      "close_spread": 4.5,
+      "close_total": 221.5,
+      "ats_result": "home",
+      "ou_result": "under",
+      "edge_ats": "WIN",
+      "under_result": "WIN"
+    },
+    {
+      "event_id": "BVZysmesrGz0QbjpVEta",
+      "date": "2026-03-04",
+      "starts_at": "2026-03-05T01:00:00.000Z",
+      "matchup": "POR @ MEM",
+      "away": "POR",
+      "home": "MEM",
+      "away_score": 122,
+      "home_score": 114,
+      "away_fatigue": 0,
+      "home_fatigue": 6.0,
+      "away_scenario": null,
+      "home_scenario": "C",
+      "away_detail": "Road, full rest",
+      "home_detail": "BTB away\u2192home \u00b7 701mi",
+      "fatigue_diff": 6.0,
+      "edge": "AWAY",
+      "flagged_team": "MEM",
+      "both_tired": false,
+      "close_spread": 9.5,
+      "close_total": 231.5,
+      "ats_result": "home",
+      "ou_result": "over",
+      "edge_ats": "LOSS",
+      "under_result": null
+    }
+  ],
   "meta": {
-    "last_updated": "",
-    "total_flagged": 0
+    "last_updated": "2026-03-05 15:48 ET",
+    "total_flagged": 2
   }
 }
