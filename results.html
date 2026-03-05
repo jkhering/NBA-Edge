@@ -120,6 +120,7 @@ footer{margin-top:40px;padding:20px 32px;border-top:1px solid var(--border);
     <div class="stat-card loss"><div class="stat-label">Edge Losses</div><div class="stat-value" id="s-losses">—</div></div>
     <div class="stat-card"><div class="stat-label">Under W-L</div><div class="stat-value" id="s-under-wl">—</div><div class="stat-sub" id="s-under-pct">—</div></div>
     <div class="stat-card"><div class="stat-label">No Line Data</div><div class="stat-value" id="s-no-line">—</div></div>
+    <div class="stat-card edge"><div class="stat-label">Combined W-L</div><div class="stat-value" id="s-combined-wl">—</div><div class="stat-sub" id="s-combined-pct">—</div></div>
   </div>
 
   <!-- ROI SECTION -->
@@ -274,7 +275,12 @@ function render() {
 
   const edgePct  = withLine.length > 0 ? Math.round(wins/(wins+losses)*100) : null;
   const underPct = underGames.length > 0 ? Math.round(underWins/(underWins+underLoss)*100) : null;
-
+  
+  const combined = [...withLine, ...underGames.filter(g => !withLine.includes(g))];
+  const combinedWins = ALL_GAMES.filter(g => g.edge_ats === 'WIN' || g.under_result === 'WIN').length;
+  const combinedLosses = ALL_GAMES.filter(g => g.edge_ats === 'LOSS' || g.under_result === 'LOSS').length;
+  const combinedPct = (combinedWins + combinedLosses) > 0 ? Math.round(combinedWins/(combinedWins+combinedLosses)*100) : null;
+  
   document.getElementById('s-total').textContent    = total;
   document.getElementById('s-edge-wl').textContent  = withLine.length ? `${wins}-${losses}` : '—';
   document.getElementById('s-edge-pct').textContent = edgePct !== null ? `${edgePct}% win rate` : 'Awaiting data';
@@ -283,6 +289,8 @@ function render() {
   document.getElementById('s-under-wl').textContent = underGames.length ? `${underWins}-${underLoss}` : '—';
   document.getElementById('s-under-pct').textContent= underPct !== null ? `${underPct}% win rate` : 'Awaiting data';
   document.getElementById('s-no-line').textContent  = noLine;
+  document.getElementById('s-combined-wl').textContent = (combinedWins + combinedLosses) ? `${combinedWins}-${combinedLosses}` : '—';
+  document.getElementById('s-combined-pct').textContent = combinedPct !== null ? `${combinedPct}% win rate` : 'Awaiting data';
 
   // ROI bars
   if(edgePct !== null) {
