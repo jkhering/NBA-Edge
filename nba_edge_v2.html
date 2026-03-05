@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NBA Edge Model</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap');
+:root {
+  --bg:#080b10;--surface:#0e1219;--surface2:#141a23;--border:#1e2733;--border2:#2a3545;
+  --accent:#f0c040;--accent2:#40a0f0;--text:#dce8f5;--muted:#5a7090;
+  --green:#30d080;--yellow:#f0c040;--orange:#f07030;--red:#e03050;--critical:#ff1060;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-height:100vh;
+  background-image:radial-gradient(ellipse 80% 50% at 50% -20%,rgba(64,160,240,0.08) 0%,transparent 60%),
+  repeating-linear-gradient(0deg,transparent,transparent 60px,rgba(30,39,51,0.3) 60px,rgba(30,39,51,0.3) 61px),
+  repeating-linear-gradient(90deg,transparent,transparent 60px,rgba(30,39,51,0.3) 60px,rgba(30,39,51,0.3) 61px);}
+
+/* HEADER */
+.header{padding:24px 32px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:20px;
+  background:rgba(8,11,16,0.9);backdrop-filter:blur(10px);position:sticky;top:0;z-index:100;}
+.logo{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:28px;letter-spacing:3px;
+  text-transform:uppercase;color:var(--accent);line-height:1;}
+.logo span{color:var(--accent2);}
+.header-meta{display:flex;flex-direction:column;gap:2px;}
+.version{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:1px;}
+.api-status{font-family:'DM Mono',monospace;font-size:10px;display:flex;align-items:center;gap:6px;}
+.status-dot{width:6px;height:6px;border-radius:50%;background:var(--muted);transition:background 0.3s;}
+.status-dot.live{background:var(--green);box-shadow:0 0 6px var(--green);}
+.status-dot.error{background:var(--red);}
+.header-date{margin-left:auto;font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:600;letter-spacing:1px;color:var(--muted);}
+.refresh-btn{background:transparent;border:1px solid var(--border2);color:var(--accent2);font-family:'DM Mono',monospace;
+  font-size:11px;padding:7px 14px;border-radius:4px;cursor:pointer;letter-spacing:1px;transition:all 0.2s;}
+.refresh-btn:hover{background:var(--accent2);color:var(--bg);border-color:var(--accent2);}
+.refresh-btn:disabled{opacity:0.4;cursor:not-allowed;}
+
+/* MAIN */
+.main{padding:28px 32px;max-width:1400px;margin:0 auto;}
+.section-header{display:flex;align-items:baseline;gap:12px;margin-bottom:18px;}
+.section-title{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:3px;text-transform:uppercase;color:var(--muted);}
+.game-count{font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);}
+.state-display{text-align:center;padding:60px 20px;color:var(--muted);font-family:'DM Mono',monospace;font-size:13px;}
+.spinner{width:32px;height:32px;border:2px solid var(--border2);border-top-color:var(--accent2);
+  border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* DATE NAV */
+.date-nav{display:flex;align-items:center;gap:12px;margin-bottom:24px;}
+.date-nav input[type="date"]{background:var(--surface);border:1px solid var(--border2);color:var(--text);
+  padding:8px 14px;border-radius:6px;font-family:'DM Mono',monospace;font-size:13px;outline:none;cursor:pointer;}
+.date-nav input[type="date"]:focus{border-color:var(--accent);}
+.date-btn{background:var(--surface);border:1px solid var(--border2);color:var(--muted);padding:8px 14px;
+  border-radius:6px;font-family:'DM Mono',monospace;font-size:13px;cursor:pointer;transition:all 0.2s;}
+.date-btn:hover{border-color:var(--accent);color:var(--accent);}
+
+/* RANKINGS PANEL */
+.summary-panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px 24px;margin-bottom:24px;}
+.summary-title{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;letter-spacing:3px;
+  text-transform:uppercase;color:var(--muted);margin-bottom:14px;}
+.rankings-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:8px;}
+.rank-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+  padding:10px 12px;display:flex;align-items:center;gap:10px;}
+.rank-card.rc-critical{border-color:rgba(255,16,96,0.5);background:rgba(255,16,96,0.05);}
+.rank-card.rc-red{border-color:rgba(224,48,80,0.4);background:rgba(224,48,80,0.04);}
+.rank-card.rc-orange{border-color:rgba(240,112,48,0.35);}
+.rank-card.rc-yellow{border-color:rgba(240,192,64,0.2);}
+.rank-card.rc-green{opacity:0.6;}
+.rank-num{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);min-width:14px;text-align:right;}
+.rank-body{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;}
+.rank-team{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:32px;letter-spacing:1px;color:var(--text);line-height:1;}
+.rank-meta{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rank-pills{display:flex;gap:3px;margin-top:2px;flex-wrap:wrap;}
+.rank-pill{font-family:'DM Mono',monospace;font-size:12px;padding:1px 4px;border-radius:2px;}
+.rank-pill-btb{background:rgba(240,112,48,0.15);color:var(--orange);border:1px solid rgba(240,112,48,0.3);}
+.rank-pill-density{background:rgba(200,100,255,0.12);color:#c864ff;border:1px solid rgba(200,100,255,0.3);}
+.rank-score{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:32px;letter-spacing:0;line-height:1;margin-left:auto;flex-shrink:0;}
+.no-flags{font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);padding:12px 0;}
+
+/* GAMES GRID */
+.games-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:16px;margin-bottom:32px;}
+
+/* GAME CARD */
+.game-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;
+  transition:border-color 0.2s,transform 0.15s;animation:fadeUp 0.4s ease both;}
+.game-card:hover{transform:translateY(-2px);border-color:var(--border2);}
+.game-card.flag-poor{border-color:rgba(240,112,48,0.5);}
+.game-card.flag-critical{border-color:rgba(255,16,96,0.6);box-shadow:0 0 20px rgba(255,16,96,0.1);}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+
+/* TIP BAR */
+.tip-bar{background:var(--surface2);border-bottom:1px solid var(--border);padding:8px 16px;
+  display:flex;align-items:center;justify-content:space-between;}
+.tip-time{font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:1px;}
+.game-status{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:1px;}
+.game-status.live-status{color:var(--green);animation:blink 1.5s infinite;}
+@keyframes blink{50%{opacity:0.5;}}
+
+/* MATCHUP — big score number sits above team abbr */
+.matchup{padding:14px 16px 0;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;}
+.team-side{display:flex;flex-direction:column;}
+.team-side.away{align-items:flex-start;}
+.team-side.home{align-items:flex-end;}
+.team-fatigue-big{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:46px;line-height:1;letter-spacing:0;}
+.team-abbr{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:42px;letter-spacing:1px;line-height:1;color:var(--text);margin-top:1px;}
+.team-full{font-size:11px;color:var(--muted);margin-top:2px;font-weight:300;}
+.team-label{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--muted);margin-top:3px;}
+.pills-row{display:flex;gap:3px;margin-top:4px;flex-wrap:wrap;min-height:22px;}
+.vs-block{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:28px;color:var(--border2);letter-spacing:2px;text-align:center;}
+.score-display{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:36px;color:var(--accent);text-align:center;}
+.density-pill{display:inline-flex;align-items:center;font-family:'DM Mono',monospace;font-size:12px;
+  padding:2px 6px;border-radius:3px;background:rgba(240,112,48,0.15);color:var(--orange);border:1px solid rgba(240,112,48,0.3);}
+
+/* REST DETAIL */
+.tiers-row{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);margin-top:12px;border-top:1px solid var(--border);}
+.tier-cell{background:var(--surface);padding:10px 14px;display:flex;flex-direction:column;gap:3px;}
+.tier-cell.away{border-right:1px solid var(--border);}
+.tier-label-sm{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;}
+.tier-badge-sm{display:inline-flex;align-items:center;gap:5px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px;}
+.tier-badge-sm.full{color:var(--green);}.tier-badge-sm.good{color:#a8d840;}
+.tier-badge-sm.average{color:var(--yellow);}.tier-badge-sm.poor{color:var(--orange);}.tier-badge-sm.critical{color:var(--critical);}
+.tier-detail{font-size:12px;color:var(--muted);font-weight:300;}
+
+/* EDGE FLAG */
+.edge-flag{padding:8px 14px;background:var(--surface2);border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;font-size:14px;}
+.edge-flag.no-edge{color:var(--muted);}.edge-flag.slight{color:var(--yellow);}
+.edge-flag.moderate{color:var(--orange);}.edge-flag.strong{color:var(--red);}
+.edge-icon{font-size:14px;}
+
+/* MISC */
+.test-banner{background:rgba(240,192,64,0.08);border:1px solid rgba(240,192,64,0.2);border-radius:6px;
+  padding:10px 16px;font-family:'DM Mono',monospace;font-size:11px;color:var(--yellow);margin-bottom:20px;display:flex;align-items:center;gap:10px;}
+footer{margin-top:40px;padding:20px 32px;border-top:1px solid var(--border);display:flex;justify-content:space-between;
+  font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:1px;}
+</style>
+</head>
+<body>
+<header class="header">
+  <div class="logo">NBA<span>EDGE</span></div>
+  <div class="header-meta">
+    <div class="version">v1.1 — ALTITUDE</div>
+    <div class="api-status">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-text">Connecting...</span>
+    </div>
+  </div>
+  <div class="header-date" id="header-date"></div>
+  <button class="refresh-btn" id="refresh-btn" onclick="loadGames()">↻ REFRESH</button>
+</header>
+
+<div class="main">
+
+  <div class="date-nav">
+    <button class="date-btn" onclick="shiftDate(-1)">← PREV</button>
+    <input type="date" id="date-picker" onchange="loadGames()">
+    <button class="date-btn" onclick="shiftDate(1)">NEXT →</button>
+  </div>
+
+  <!-- FATIGUE RANKINGS -->
+  <div class="summary-panel">
+    <div class="summary-title">⚡ Fatigue Rankings — Tonight</div>
+    <div id="rankings-container"><div class="no-flags">Loading...</div></div>
+  </div>
+
+  <!-- GAMES -->
+  <div class="section-header">
+    <div class="section-title">Tonight's Games</div>
+    <div class="game-count" id="game-count"></div>
+  </div>
+  <div id="games-container">
+    <div class="state-display"><div class="spinner"></div>Fetching games from BallDontLie API...</div>
+  </div>
+</div>
+
+<footer>
+  <span>NBA EDGE MODEL v1.1</span>
+  <span>PHASE 1 — TRAVEL & REST ENGINE</span>
+  <span>DATA: BALLDONTLIE.IO (FREE TIER)</span>
+</footer>
+
+<script>
+const API_KEY = '6fc270d3-c30f-448d-8034-6a01ff60c546';
+const BASE_URL = 'https://api.balldontlie.io/v1';
+
+const ARENAS = {
+  ATL:{city:"Atlanta",       lat:33.7573,lon:-84.3963, tz:-5},
+  BOS:{city:"Boston",        lat:42.3662,lon:-71.0621, tz:-5},
+  BKN:{city:"Brooklyn",      lat:40.6826,lon:-73.9754, tz:-5},
+  CHA:{city:"Charlotte",     lat:35.2251,lon:-80.8392, tz:-5},
+  CHI:{city:"Chicago",       lat:41.8807,lon:-87.6742, tz:-6},
+  CLE:{city:"Cleveland",     lat:41.4965,lon:-81.6882, tz:-5},
+  DAL:{city:"Dallas",        lat:32.7905,lon:-96.8103, tz:-6},
+  DEN:{city:"Denver",        lat:39.7487,lon:-105.0077,tz:-7},
+  DET:{city:"Detroit",       lat:42.3410,lon:-83.0552, tz:-5},
+  GSW:{city:"San Francisco", lat:37.7680,lon:-122.3877,tz:-8},
+  HOU:{city:"Houston",       lat:29.7508,lon:-95.3621, tz:-6},
+  IND:{city:"Indianapolis",  lat:39.7640,lon:-86.1555, tz:-5},
+  LAC:{city:"Los Angeles",   lat:33.8958,lon:-118.3386,tz:-8},
+  LAL:{city:"Los Angeles",   lat:34.0430,lon:-118.2673,tz:-8},
+  MEM:{city:"Memphis",       lat:35.1383,lon:-90.0505, tz:-6},
+  MIA:{city:"Miami",         lat:25.7814,lon:-80.1870, tz:-5},
+  MIL:{city:"Milwaukee",     lat:43.0450,lon:-87.9170, tz:-6},
+  MIN:{city:"Minneapolis",   lat:44.9795,lon:-93.2762, tz:-6},
+  NOP:{city:"New Orleans",   lat:29.9490,lon:-90.0812, tz:-6},
+  NYK:{city:"New York",      lat:40.7505,lon:-73.9934, tz:-5},
+  OKC:{city:"Okla. City",    lat:35.4634,lon:-97.5151, tz:-6},
+  ORL:{city:"Orlando",       lat:28.5392,lon:-81.3839, tz:-5},
+  PHI:{city:"Philadelphia",  lat:39.9012,lon:-75.1720, tz:-5},
+  PHX:{city:"Phoenix",       lat:33.4457,lon:-112.0712,tz:-7},
+  POR:{city:"Portland",      lat:45.5316,lon:-122.6668,tz:-8},
+  SAC:{city:"Sacramento",    lat:38.5802,lon:-121.4997,tz:-8},
+  SAS:{city:"San Antonio",   lat:29.4270,lon:-98.4375, tz:-6},
+  TOR:{city:"Toronto",       lat:43.6435,lon:-79.3791, tz:-5},
+  UTA:{city:"Salt Lake City",lat:40.7683,lon:-111.9011,tz:-7},
+  WAS:{city:"Washington DC", lat:38.8981,lon:-77.0209, tz:-5},
+};
+
+const ALTITUDE_ARENAS = new Set(['DEN', 'UTA']); // DEN=5280ft, UTA=4300ft — meaningful elevation penalty for unadapted road teams
+
+const TEAM_NAMES = {
+  ATL:"Atlanta Hawks",BOS:"Boston Celtics",BKN:"Brooklyn Nets",CHA:"Charlotte Hornets",
+  CHI:"Chicago Bulls",CLE:"Cleveland Cavaliers",DAL:"Dallas Mavericks",DEN:"Denver Nuggets",
+  DET:"Detroit Pistons",GSW:"Golden State Warriors",HOU:"Houston Rockets",IND:"Indiana Pacers",
+  LAC:"LA Clippers",LAL:"Los Angeles Lakers",MEM:"Memphis Grizzlies",MIA:"Miami Heat",
+  MIL:"Milwaukee Bucks",MIN:"Minnesota Timberwolves",NOP:"New Orleans Pelicans",NYK:"New York Knicks",
+  OKC:"Oklahoma City Thunder",ORL:"Orlando Magic",PHI:"Philadelphia 76ers",PHX:"Phoenix Suns",
+  POR:"Portland Trail Blazers",SAC:"Sacramento Kings",SAS:"San Antonio Spurs",TOR:"Toronto Raptors",
+  UTA:"Utah Jazz",WAS:"Washington Wizards"
+};
+
+// ── TIMEZONE ──────────────────────────────────────────────────────
+// Returns actual UTC offset (e.g. -5, -4) for an arena on a given date.
+// Uses Intl to handle DST automatically — no hardcoded seasonal logic needed.
+// dateStr: YYYY-MM-DD string. Falls back to hardcoded tz if arena unknown.
+const ARENA_TIMEZONES = {
+  ATL:'America/New_York',  BOS:'America/New_York',  BKN:'America/New_York',
+  CHA:'America/New_York',  CHI:'America/Chicago',   CLE:'America/New_York',
+  DAL:'America/Chicago',   DEN:'America/Denver',    DET:'America/New_York',
+  GSW:'America/Los_Angeles',HOU:'America/Chicago',  IND:'America/New_York',
+  LAC:'America/Los_Angeles',LAL:'America/Los_Angeles',MEM:'America/Chicago',
+  MIA:'America/New_York',  MIL:'America/Chicago',   MIN:'America/Chicago',
+  NOP:'America/Chicago',   NYK:'America/New_York',  OKC:'America/Chicago',
+  ORL:'America/New_York',  PHI:'America/New_York',  PHX:'America/Phoenix',
+  POR:'America/Los_Angeles',SAC:'America/Los_Angeles',SAS:'America/Chicago',
+  TOR:'America/Toronto',   UTA:'America/Denver',    WAS:'America/New_York',
+};
+
+function getUTCOffset(arenaAbbr, dateStr){
+  const tz = ARENA_TIMEZONES[arenaAbbr];
+  if(!tz) return ARENAS[arenaAbbr]?.tz ?? -6; // fallback to hardcoded
+  try{
+    // Get UTC offset by comparing UTC time to local time on that date at noon
+    const [y,m,d] = (dateStr || new Date().toLocaleDateString('en-CA')).split('-').map(Number);
+    const dt = new Date(Date.UTC(y, m-1, d, 17, 0, 0)); // noon ET = 17:00 UTC, safe midday anchor
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz, hour: 'numeric', hour12: false
+    }).formatToParts(dt);
+    const localHr = parseInt(parts.find(p => p.type === 'hour').value);
+    // UTC hour is 17, local hour tells us the offset
+    let offset = localHr - 17;
+    if(offset > 6) offset -= 24; // handle day boundary
+    if(offset < -12) offset += 24;
+    return offset;
+  } catch(e){ return ARENAS[arenaAbbr]?.tz ?? -6; }
+}
+
+// ── GEOMETRY ──────────────────────────────────────────────────────
+function haversine(lat1,lon1,lat2,lon2){
+  const R=3959,dLat=(lat2-lat1)*Math.PI/180,dLon=(lon2-lon1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return Math.round(R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)));
+}
+function getDist(a,b){
+  if(a===b) return 0;
+  if((a==='LAL'&&b==='LAC')||(a==='LAC'&&b==='LAL')) return 12;
+  if((a==='NYK'&&b==='BKN')||(a==='BKN'&&b==='NYK')) return 8;
+  if(!ARENAS[a]||!ARENAS[b]) return 0;
+  return haversine(ARENAS[a].lat,ARENAS[a].lon,ARENAS[b].lat,ARENAS[b].lon);
+}
+
+// ── TIME UTILITIES ────────────────────────────────────────────────
+function parseTipET(datetimeStr){
+  if(!datetimeStr) return 19.5;
+  const d=new Date(datetimeStr);
+  const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',hour:'numeric',minute:'numeric',hour12:false}).formatToParts(d);
+  const h=parseInt(parts.find(p=>p.type==='hour').value);
+  const m=parseInt(parts.find(p=>p.type==='minute').value);
+  return h+m/60;
+}
+function formatTipTime(datetimeStr){
+  if(!datetimeStr) return 'TBD';
+  return new Date(datetimeStr).toLocaleTimeString('en-US',{timeZone:'America/New_York',hour:'numeric',minute:'2-digit',hour12:true})+' ET';
+}
+function todayET(){
+  return new Date().toLocaleDateString('en-CA',{timeZone:'America/New_York'});
+}
+function formatDateDisplay(dateStr){
+  const [y,m,d]=dateStr.split('-').map(Number);
+  return new Date(y,m-1,d,12).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}).toUpperCase();
+}
+
+// ── SLEEP ESTIMATOR ───────────────────────────────────────────────
+// All arithmetic stays in decimal hours (0–48 range, no am/pm wrapping).
+// Wake-up is hard-capped at 10:00am local — realistic game-day ceiling.
+// prevTipLocalHr: actual tip time at fromArena in local hours (e.g. 20.5 = 8:30pm).
+//   Defaults to 20.0 (8pm) if unknown.
+// Timeline for Scenario A (Away→Away road trip):
+//   Prev game ends: prevTip + 2.5hrs
+//   Charter departs: game end + 2.5hrs post-game lag
+//   Flight: dist/500 hrs
+//   Hotel arrival: landing + 0.75hrs
+//   Sleep window: hotel arrival → 10am local (hard cap)
+//   Plane sleep: time airborne after midnight at 50% quality
+function estimateBTBSleep(fromArena, toArena, prevTipLocalHr = 20.0){
+  const dist = getDist(fromArena, toArena);
+  const flightHrs = dist / 500;
+  const toTZ = getUTCOffset(toArena);
+  const fromTZ = getUTCOffset(fromArena);
+
+  // Work entirely in destination local time (hours since midnight prev night)
+  const gameEndFromLocal = prevTipLocalHr + 2.5; // game ends ~2.5hrs after tip
+  const tzShift = toTZ - fromTZ;  // positive = flying east (lose hours), negative = west (gain hours)
+  const departureFromLocal = gameEndFromLocal + 2.5; // post-game lag: showers, bus, security
+
+  // Convert departure to destination local time
+  const departureDestLocal = departureFromLocal + tzShift;
+
+  // Landing and hotel arrival in destination local
+  const landingDestLocal = departureDestLocal + flightHrs;
+  const hotelArrivalLocal = landingDestLocal + 0.75; // 45min tarmac→bed
+
+  // Hard cap: must be up by 10am local (= 10.0, or 34.0 if after midnight)
+  // hotelArrivalLocal may be e.g. 25.5 (1:30am next day in 0-48 scale)
+  // 10am next day = 34.0 in same scale
+  const wakeUpLocal = 34.0; // 10:00am expressed as hours-since-midnight-prev-night
+
+  // Hotel sleep = time between arrival and 10am, floored at 0
+  const hotelSleepHrs = Math.max(0, wakeUpLocal - hotelArrivalLocal);
+
+  // Plane sleep: if still airborne past midnight (24.0), some sleep possible
+  // Only count time on plane between midnight and landing, at 50% quality
+  const midnightOnPlane = Math.max(0, 24.0 - (departureDestLocal + flightHrs) + flightHrs);
+  // Simpler: time on plane after midnight = max(0, landing - max(departure, 24))
+  const planeAfterMidnight = Math.max(0, landingDestLocal - Math.max(departureDestLocal, 24.0));
+  const planeSleepHrs = planeAfterMidnight * 0.5; // 50% quality
+
+  const totalEffectiveSleep = hotelSleepHrs + planeSleepHrs;
+
+  // Format arrival for display
+  const arrMod = ((hotelArrivalLocal % 24) + 24) % 24;
+  const arrH12 = Math.floor(arrMod > 12 ? arrMod - 12 : (arrMod === 0 ? 12 : arrMod));
+  const arrMin = Math.round((arrMod % 1) * 60).toString().padStart(2,'0');
+  const arrAMPM = arrMod >= 12 ? 'pm' : 'am';
+  const arrDisplay = `~${arrH12}:${arrMin}${arrAMPM} local`;
+
+  return {
+    dist,
+    flightHrs: Math.round(flightHrs * 10) / 10,
+    hotelArrivalLocal: Math.round(hotelArrivalLocal * 10) / 10,
+    hotelSleepHrs: Math.round(hotelSleepHrs * 10) / 10,
+    planeSleepHrs: Math.round(planeSleepHrs * 10) / 10,
+    totalEffectiveSleep: Math.round(totalEffectiveSleep * 10) / 10,
+    tzDelta: tzShift,
+    arrDisplay,
+  };
+}
+
+// ── COMPOSITE FATIGUE SCORE (0–10) ────────────────────────────────
+// BTB base: A=5 (away→away), C=4 (away→home), B=3 (home→away), home-home=2
+// Sleep modifier (BTB only): <4hrs +4, 4–5.9hrs +2, 6–6.9hrs +1, ≥7hrs +0
+// Eastbound tz penalty: +0.5/hr crossed (max +1.5) — eastbound = positive tzDelta
+// Prev game late tip (BTB only): prev tip ≥ 9:30pm local → +0.5
+//   (later finish = later charter = less sleep)
+// Schedule density: 4-in-6 +2, 3-in-4 +1
+function computeFatigueScore(scenario, isBTB, effectiveSleep, tzDelta, prevTipWasLate, densityTag, altitudePenalty=0){
+  let base = 0;
+  if(isBTB) base = scenario==='A' ? 5 : scenario==='C' ? 4 : scenario==='B' ? 3 : 2;
+  const sleepMod = (isBTB && effectiveSleep !== null)
+    ? (effectiveSleep < 4 ? 4 : effectiveSleep < 6 ? 2 : effectiveSleep < 7 ? 1 : 0) : 0;
+  const tzMod = tzDelta > 0 ? Math.min(tzDelta * 0.5, 1.5) : 0; // eastbound = positive tzDelta = losing hours
+  const lateMod = (isBTB && prevTipWasLate) ? 0.5 : 0;
+  const densityMod = densityTag==='4-in-6' ? 2 : densityTag==='3-in-4' ? 1 : 0;
+  return Math.min(10, Math.max(0, Math.round((base + sleepMod + tzMod + lateMod + densityMod + altitudePenalty) * 10) / 10));
+}
+
+// ── MAIN FATIGUE ANALYZER ─────────────────────────────────────────
+// prevTipLocalHr: tip time of previous game in local hours at that arena (default 19.5)
+// prevTipWasLate: true if prev tip was ≥ 9:30pm local (adds +0.5 to BTB score)
+function analyzeFatigue(teamAbbr, isHome, daysRest, prevArena, homeTeamAbbr, wasHomeLastGame, gamesIn4=1, gamesIn6=1, prevTipLocalHr=19.5, prevTipWasLate=false, recentAltitudeVisit=false){
+  if(daysRest === null){
+    return {tier:'good',isBTB:false,dist:0,flightHrs:0,tzDelta:0,effectiveSleep:null,
+      detail:'Rest unknown',sleepDetail:null,densityTag:null,scenario:null,fatigueScore:0,altitudePenalty:0};
+  }
+
+  let densityTag = null;
+  if(gamesIn4 >= 3) densityTag = gamesIn6 >= 4 ? '4-in-6' : '3-in-4';
+  else if(gamesIn6 >= 4) densityTag = '4-in-6';
+
+  // Altitude penalty: +1.0 for road teams at DEN/UTA with no recent altitude visit (past 4 days)
+  // Home team is acclimated — no penalty. Road team flying in from sea level takes real hit.
+  const altitudePenalty = (!isHome && ALTITUDE_ARENAS.has(homeTeamAbbr) && !recentAltitudeVisit) ? 1.0 : 0;
+
+  const isBTB = daysRest === 0;
+
+  // ── HOME TEAM ──
+  if(isHome){
+    if(!isBTB){
+      return {tier:daysRest>=2?'full':'good', isBTB:false, dist:0, flightHrs:0, tzDelta:0,
+        effectiveSleep:99, detail:'Home court', sleepDetail:null, scenario:null, densityTag,
+        fatigueScore: computeFatigueScore(null, false, 99, 0, false, densityTag, altitudePenalty), altitudePenalty};
+    }
+    if(!wasHomeLastGame){
+      // Scenario C: Away→Home BTB — flew home, sleeping in own bed
+      const s = estimateBTBSleep(prevArena || teamAbbr, homeTeamAbbr, prevTipLocalHr);
+      const adj = s.totalEffectiveSleep; // no own bed bonus — base score difference (C=4 vs A=5) carries that distinction
+      const tier = adj >= 7 ? 'good' : adj >= 6 ? 'average' : adj >= 4 ? 'poor' : 'critical';
+      return {tier, isBTB:true, dist:s.dist, flightHrs:s.flightHrs, tzDelta:s.tzDelta,
+        effectiveSleep: Math.round(adj*10)/10,
+        detail: `BTB (away→home) · flew ${s.dist.toLocaleString()} mi`,
+        sleepDetail: `~${adj.toFixed(1)}hrs · ${s.arrDisplay}`,
+        densityTag, scenario:'C',
+        fatigueScore: computeFatigueScore('C', true, adj, s.tzDelta, prevTipWasLate, densityTag, altitudePenalty), altitudePenalty};
+    } else {
+      // Home→Home BTB — own bed both nights, sleep calc based on previous tip time
+      // Timeline: game ends prevTip + 2.5hrs, leave arena ~1hr after buzzer, in bed prevTip + 3.5hrs
+      // Wake cap: 10am local (34.0 in hours-since-midnight scale)
+      const prevTipAdj = prevTipLocalHr < 12 ? prevTipLocalHr + 24 : prevTipLocalHr;
+      const bedTimeLocal = prevTipAdj + 3.5;
+      const hhSleep = Math.max(0, 34.0 - bedTimeLocal);
+      const hhSleepRnd = Math.round(hhSleep * 10) / 10;
+      const hhTier = hhSleepRnd >= 7 ? 'good' : hhSleepRnd >= 6 ? 'average' : hhSleepRnd >= 4 ? 'poor' : 'critical';
+      return {tier: hhTier, isBTB:true, dist:0, flightHrs:0, tzDelta:0, effectiveSleep: hhSleepRnd,
+        detail:'Home BTB — own bed both nights', sleepDetail:`~${hhSleepRnd.toFixed(1)}hrs`,
+        densityTag, scenario:'home-home',
+        fatigueScore: computeFatigueScore('home-home', true, hhSleepRnd, 0, prevTipWasLate, densityTag, altitudePenalty), altitudePenalty};
+    }
+  }
+
+  // ── AWAY TEAM, 2+ DAYS REST ──
+  if(daysRest >= 2){
+    return {tier:'full', isBTB:false, dist:getDist(prevArena||teamAbbr, homeTeamAbbr),
+      flightHrs:0, tzDelta:0, effectiveSleep:99, detail:'Road game, full rest',
+      sleepDetail:null, densityTag, scenario:null,
+      fatigueScore: computeFatigueScore(null, false, 99, 0, false, densityTag, altitudePenalty), altitudePenalty};
+  }
+
+  // ── AWAY TEAM, 1 DAY REST ──
+  if(daysRest === 1){
+    const dist = getDist(prevArena||teamAbbr, homeTeamAbbr);
+    const tzDelta = getUTCOffset(homeTeamAbbr) - getUTCOffset(prevArena);
+    const severeBodyClock = tzDelta >= 2 && dist > 1800; // eastbound = positive tzDelta
+    return {tier: severeBodyClock?'average':'good', isBTB:false, dist, flightHrs:0, tzDelta,
+      effectiveSleep:99,
+      detail: severeBodyClock ? `Road — body clock (${dist.toLocaleString()} mi east)` : 'Road game, 1 day rest',
+      sleepDetail:null, densityTag, scenario:null,
+      fatigueScore: computeFatigueScore(null, false, 99, severeBodyClock?tzDelta:0, false, densityTag, altitudePenalty), altitudePenalty};
+  }
+
+  // ── AWAY TEAM, BTB ──
+  if(wasHomeLastGame){
+    // Scenario B: Home→Away BTB
+    // Slept at home last night. Flew today. Body clock penalty for eastbound.
+    // Sleep calc: game ends prevTip+2.5hrs, home by prevTip+3.5hrs, wake capped 10am
+    const dist = getDist(teamAbbr, homeTeamAbbr);
+    const tzDelta = getUTCOffset(homeTeamAbbr) - getUTCOffset(teamAbbr);
+    const prevTipAdjB = prevTipLocalHr < 12 ? prevTipLocalHr + 24 : prevTipLocalHr;
+    const rawSleepB = Math.max(0, 34.0 - (prevTipAdjB + 3.5));
+    const bodyClockPenalty = tzDelta > 0 ? tzDelta * 0.3 : 0; // eastbound = positive tzDelta
+    const adj = Math.max(0, rawSleepB - bodyClockPenalty);
+    const tier = adj >= 7 ? 'good' : adj >= 6 ? 'average' : adj >= 4 ? 'poor' : 'critical';
+    const tzLabel = tzDelta === 0 ? '' : tzDelta > 0 ? ` · ${tzDelta}hr east` : ` · ${Math.abs(tzDelta)}hr west`;
+    return {tier, isBTB:true, dist, flightHrs:Math.round(dist/500*10)/10, tzDelta,
+      effectiveSleep: Math.round(adj*10)/10,
+      detail: `BTB (home→away) · ${dist.toLocaleString()} mi${tzLabel}`,
+      sleepDetail: `~${adj.toFixed(1)}hrs (slept home)`,
+      densityTag, scenario:'B',
+      fatigueScore: computeFatigueScore('B', true, adj, tzDelta, prevTipWasLate, densityTag, altitudePenalty), altitudePenalty};
+  }
+
+  // Scenario A: Away→Away BTB (road trip)
+  const fromArena = prevArena || teamAbbr;
+  const sleep = estimateBTBSleep(fromArena, homeTeamAbbr, prevTipLocalHr);
+  const adj = Math.max(0, sleep.totalEffectiveSleep);
+  const tier = adj >= 7 ? 'good' : adj >= 6 ? 'average' : adj >= 4 ? 'poor' : 'critical';
+  const tzLabel = sleep.tzDelta===0 ? '' : sleep.tzDelta>0 ? ` · ${sleep.tzDelta}hr east` : ` · ${Math.abs(sleep.tzDelta)}hr west`;
+  return {tier, isBTB:true, dist:sleep.dist, flightHrs:sleep.flightHrs, tzDelta:sleep.tzDelta,
+    effectiveSleep: Math.round(adj*10)/10,
+    detail: `BTB (road trip) · ${sleep.dist.toLocaleString()} mi${tzLabel}`,
+    sleepDetail: `~${adj.toFixed(1)}hrs · ${sleep.arrDisplay}`,
+    densityTag, scenario:'A',
+    fatigueScore: computeFatigueScore('A', true, adj, sleep.tzDelta, prevTipWasLate, densityTag, altitudePenalty), altitudePenalty};
+}
+
+const TIER_META = {
+  full:    {label:'Full Sleep', emoji:'🟢'},
+  good:    {label:'Good Sleep', emoji:'🟡'},
+  average: {label:'Avg Sleep',  emoji:'🟠'},
+  poor:    {label:'Poor Sleep', emoji:'🔴'},
+  critical:{label:'Critical',   emoji:'🚨'},
+};
+
+function scoreColor(s){
+  if(s >= 7) return 'var(--critical)';
+  if(s >= 5) return 'var(--red)';
+  if(s >= 3) return 'var(--orange)';
+  if(s >= 1) return 'var(--yellow)';
+  return 'var(--green)';
+}
+function rankCardClass(s){
+  if(s >= 7) return 'rc-critical';
+  if(s >= 5) return 'rc-red';
+  if(s >= 3) return 'rc-orange';
+  if(s >= 1) return 'rc-yellow';
+  return 'rc-green';
+}
+
+// ── API ───────────────────────────────────────────────────────────
+async function apiFetch(endpoint){
+  const res = await fetch(`${BASE_URL}${endpoint}`, {headers:{'Authorization':API_KEY}});
+  if(!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+// ── REST HISTORY ──────────────────────────────────────────────────
+function calcRestFromHistory(games, teamId, targetDate){
+  const played = games
+    .filter(g => g.status==='Final' && (g.home_team.id===teamId || g.visitor_team.id===teamId))
+    .sort((a,b) => new Date(b.date) - new Date(a.date));
+  if(!played.length) return {daysRest:null,prevLocation:null,lastGame:null,wasHomeLastGame:null,gamesIn4:0,gamesIn6:0,prevTipLocalHr:19.5,prevTipWasLate:false,recentAltitudeVisit:false};
+  const lastGame = played[0];
+  const [ty,tm,td] = targetDate.split('-').map(Number);
+  const [ly,lm,ld] = lastGame.date.split('-').map(Number);
+  const targetMs = Date.UTC(ty,tm-1,td);
+  const lastMs   = Date.UTC(ly,lm-1,ld);
+  const daysRest = Math.max(0, Math.round((targetMs-lastMs)/(1000*60*60*24)) - 1);
+  const wasHome  = lastGame.home_team.id === teamId;
+  const prevArena = lastGame.home_team.abbreviation;
+  const countInWindow = n => played.filter(g => {
+    const [gy,gm,gd] = g.date.split('-').map(Number);
+    const diff = Math.round((targetMs - Date.UTC(gy,gm-1,gd)) / (1000*60*60*24));
+    return diff >= 1 && diff <= n;
+  }).length;
+
+  // Extract prev game tip time in local hours at the arena where it was played
+  // lastGame.home_team.abbreviation = arena of that game (always home arena)
+  let prevTipLocalHr = 19.5; // default: 7:30pm local (conservative — later than typical early tip)
+  let prevTipWasLate = false;
+  if(lastGame.datetime){
+    try{
+      const prevArenaAbbr = lastGame.home_team.abbreviation;
+      const prevTZ = getUTCOffset(prevArenaAbbr);
+      const d = new Date(lastGame.datetime);
+      const utcHr = d.getUTCHours() + d.getUTCMinutes()/60;
+      const localHr = ((utcHr + prevTZ) % 24 + 24) % 24;
+      // Sanity check: tip should be between 12pm and 11:59pm local
+      // If localHr is early morning (0–11) it's likely a UTC midnight crossover — add 12 as correction
+      prevTipLocalHr = (localHr >= 12) ? localHr : localHr + 24; // UTC midnight crossover: push into 0-48 scale
+      prevTipWasLate = prevTipLocalHr >= 21.5;
+    } catch(e){ console.warn('prevTipLocalHr parse failed', e); }
+  } 
+
+  // Altitude: check if team played in DEN or UTA within past 4 days (home or away)
+  // DEN/UTA home teams naturally satisfy this via their own home games — permanent acclimation
+  const recentAltitudeVisit = played.some(g => {
+    const [gy,gm,gd] = g.date.split('-').map(Number);
+    const diff = Math.round((targetMs - Date.UTC(gy,gm-1,gd)) / (1000*60*60*24));
+    return diff >= 1 && diff <= 4 && ALTITUDE_ARENAS.has(g.home_team.abbreviation);
+  });
+
+  return {daysRest, prevLocation:prevArena, lastGame, wasHomeLastGame:wasHome,
+    gamesIn4: countInWindow(3)+1, gamesIn6: countInWindow(5)+1,
+    prevTipLocalHr, prevTipWasLate, recentAltitudeVisit};
+}
+
+// ── EDGE LABEL ────────────────────────────────────────────────────
+function getEdgeInfo(awayF, homeF){
+  const diff = awayF.fatigueScore - homeF.fatigueScore;
+  const abs  = Math.abs(diff);
+  // diff > 0 means away is more fatigued → home has the edge
+  // diff < 0 means home is more fatigued → away has the edge
+  const isHomeEdge = diff > 0;
+  const who = isHomeEdge ? 'Home edge' : 'Away edge';
+  if(abs < 2)   return {label:'—', cls:'no-edge', icon:'', isHomeEdge: null};
+  if(abs < 2.5) return {label:`Slight — ${who} (${abs.toFixed(1)})`,   cls:'slight',   icon:'▲', isHomeEdge};
+  if(abs < 4.5) return {label:`Moderate — ${who} (${abs.toFixed(1)})`, cls:'moderate', icon:'▲▲', isHomeEdge};
+  return            {label:`Strong — ${who} (${abs.toFixed(1)})`,      cls:'strong',   icon:'▲▲▲', isHomeEdge};
+}
+
+// ── RENDER GAME CARD ──────────────────────────────────────────────
+function renderGame(game, awayRest, homeRest, awayF, homeF, idx){
+  const away = game.visitor_team.abbreviation;
+  const home = game.home_team.abbreviation;
+  const tipDisplay = formatTipTime(game.datetime);
+  const awayMeta = TIER_META[awayF.tier];
+  const homeMeta = TIER_META[homeF.tier];
+  const edge = getEdgeInfo(awayF, homeF);
+  const maxScore = Math.max(awayF.fatigueScore, homeF.fatigueScore);
+  const cardClass = maxScore >= 7 ? 'flag-critical' : maxScore >= 5 ? 'flag-poor' : '';
+  const isLive  = game.status && game.status !== 'Final' && !game.status.includes(':');
+  const isFinal = game.status === 'Final';
+  const statusDisplay = isLive
+    ? `<span class="game-status live-status">● LIVE</span>`
+    : isFinal ? `<span class="game-status">FINAL</span>` : `<span class="game-status">SCHEDULED</span>`;
+  const scoreDisplay = isFinal
+    ? `<div class="score-display">${game.visitor_team_score} – ${game.home_team_score}</div>`
+    : `<div class="vs-block">@</div>`;
+  const aSC = scoreColor(awayF.fatigueScore);
+  const hSC = scoreColor(homeF.fatigueScore);
+
+  const awayPills = [
+    awayF.isBTB ? '<span class="density-pill">BTB</span>' : '',
+    awayF.densityTag ? `<span class="density-pill" style="background:rgba(200,100,255,0.15);border-color:rgba(200,100,255,0.4);color:#c864ff">${awayF.densityTag}</span>` : '',
+    awayF.altitudePenalty ? '<span class="density-pill" style="background:rgba(64,160,240,0.12);border-color:rgba(64,160,240,0.35);color:#40a0f0">ALT</span>' : '',
+  ].join('');
+  const homePills = [
+    homeF.isBTB ? '<span class="density-pill">BTB</span>' : '',
+    homeF.densityTag ? `<span class="density-pill" style="background:rgba(200,100,255,0.15);border-color:rgba(200,100,255,0.4);color:#c864ff">${homeF.densityTag}</span>` : '',
+    homeF.altitudePenalty ? '<span class="density-pill" style="background:rgba(64,160,240,0.12);border-color:rgba(64,160,240,0.35);color:#40a0f0">ALT</span>' : '',
+  ].join('');
+
+  const awayRestLabel = awayRest.lastGame
+    ? `Last: ${awayRest.lastGame.date} · ${awayRest.daysRest===0?'BTB':awayRest.daysRest+'d rest'}`
+    : '<span style="color:var(--red)">⚠ No recent data</span>';
+  const homeRestLabel = homeRest.lastGame
+    ? `Last: ${homeRest.lastGame.date} · ${homeRest.daysRest===0?'BTB':homeRest.daysRest+'d rest'}`
+    : '<span style="color:var(--red)">⚠ No recent data</span>';
+  const awaySleepLine = awayF.sleepDetail
+    ? `<div class="tier-detail" style="font-size:12px;color:var(--orange);margin-top:2px">💤 ${awayF.sleepDetail}</div>` : '';
+  const homeSleepLine = homeF.sleepDetail
+    ? `<div class="tier-detail" style="font-size:12px;color:var(--orange);margin-top:2px">💤 ${homeF.sleepDetail}</div>` : '';
+
+  return `
+    <div class="game-card ${cardClass}" style="animation-delay:${idx*0.06}s">
+      <div class="tip-bar"><span class="tip-time">${tipDisplay}</span>${statusDisplay}</div>
+      <div class="matchup">
+        <div class="team-side away">
+          <span class="team-fatigue-big" style="color:${aSC}">${awayF.fatigueScore.toFixed(1)}</span>
+          <div class="team-abbr">${away}</div>
+          <div class="pills-row">${awayPills}</div>
+        </div>
+        ${scoreDisplay}
+        <div class="team-side home">
+          <span class="team-fatigue-big" style="color:${hSC}">${homeF.fatigueScore.toFixed(1)}</span>
+          <div class="team-abbr">${home}</div>
+          <div class="pills-row">${homePills}</div>
+        </div>
+      </div>
+      <div class="tiers-row">
+        <div class="tier-cell away">
+          <div class="tier-badge-sm ${awayF.tier}">${awayMeta.emoji} ${awayMeta.label}</div>
+          <div class="tier-detail">${awayF.detail}</div>
+          <div class="tier-detail" style="font-size:10px;color:var(--muted);margin-top:2px">${awayRestLabel}</div>
+          ${awaySleepLine}
+        </div>
+        <div class="tier-cell home">
+          <div class="tier-badge-sm ${homeF.tier}">${homeMeta.emoji} ${homeMeta.label}</div>
+          <div class="tier-detail">${homeF.detail}</div>
+          <div class="tier-detail" style="font-size:10px;color:var(--muted);margin-top:2px">${homeRestLabel}</div>
+          ${homeSleepLine}
+        </div>
+      </div>
+      <div class="edge-flag ${edge.cls}" style="${edge.isHomeEdge === true ? 'justify-content:flex-end;' : edge.isHomeEdge === false ? 'justify-content:flex-start;' : 'justify-content:center;'}">
+        ${edge.icon ? `<span class="edge-icon">${edge.icon}</span>` : ''}
+        <span>${edge.label}</span>
+      </div>
+    </div>`;
+}
+
+// ── RENDER RANKINGS PANEL ─────────────────────────────────────────
+// All teams playing tonight, sorted high→low by fatigue score.
+function renderRankings(enriched){
+  const entries = [];
+  enriched.forEach(({game, awayF, homeF}) => {
+    const away = game.visitor_team.abbreviation;
+    const home = game.home_team.abbreviation;
+    const matchup = `${away}@${home}`;
+    entries.push({abbr:away, f:awayF, matchup, role:'AWAY', opp:home});
+    entries.push({abbr:home, f:homeF, matchup, role:'HOME', opp:away});
+  });
+
+  entries.sort((a,b) => b.f.fatigueScore - a.f.fatigueScore || a.abbr.localeCompare(b.abbr));
+
+  // Only show teams with meaningful fatigue (score ≥ 4)
+  const flagged = entries.filter(e => e.f.fatigueScore >= 4);
+
+  const el = document.getElementById('rankings-container');
+  if(!flagged.length){
+    el.innerHTML = '<div class="no-flags">No significant fatigue tonight — all teams score below 4.0.</div>';
+    return;
+  }
+
+  const cards = flagged.map((e, i) => {
+    const sc  = scoreColor(e.f.fatigueScore);
+    const cls = rankCardClass(e.f.fatigueScore);
+    const btbPill      = e.f.isBTB           ? '<span class="rank-pill rank-pill-btb">BTB</span>'            : '';
+    const densityPill  = e.f.densityTag      ? `<span class="rank-pill rank-pill-density">${e.f.densityTag}</span>` : '';
+    const altPill      = e.f.altitudePenalty ? '<span class="rank-pill" style="background:rgba(64,160,240,0.12);border:1px solid rgba(64,160,240,0.35);color:#40a0f0">ALT</span>' : '';
+    const scenarioLabel = e.f.scenario === 'A' ? 'road'
+      : e.f.scenario === 'B' ? 'H→A'
+      : e.f.scenario === 'C' ? 'A→H'
+      : e.f.scenario === 'home-home' ? 'H-H'
+      : e.role.toLowerCase();
+    return `
+      <div class="rank-card ${cls}">
+        <div class="rank-num">${i+1}</div>
+        <div class="rank-body">
+          <div class="rank-team">${e.abbr}</div>
+          <div class="rank-meta">vs ${e.opp} · ${scenarioLabel}</div>
+          <div class="rank-pills">${btbPill}${densityPill}${altPill}</div>
+        </div>
+        <div class="rank-score" style="color:${sc}">${e.f.fatigueScore.toFixed(1)}</div>
+      </div>`;
+  }).join('');
+
+  el.innerHTML = `<div class="rankings-grid">${cards}</div>`;
+}
+
+// ── MAIN LOAD ─────────────────────────────────────────────────────
+async function loadGames(){
+  const dateStr = document.getElementById('date-picker').value;
+  if(!dateStr) return;
+  document.getElementById('header-date').textContent = formatDateDisplay(dateStr);
+  document.getElementById('games-container').innerHTML = `<div class="state-display"><div class="spinner"></div>Fetching games for ${dateStr}...</div>`;
+  document.getElementById('rankings-container').innerHTML = '<div class="no-flags">Loading...</div>';
+  document.getElementById('game-count').textContent = '';
+  document.getElementById('refresh-btn').disabled = true;
+  const dot = document.getElementById('status-dot');
+  const statusText = document.getElementById('status-text');
+  dot.className = 'status-dot';
+  statusText.textContent = 'Connecting...';
+
+  try{
+    const gamesResp = await apiFetch(`/games?dates[]=${dateStr}&per_page=100`);
+    const games = gamesResp.data || [];
+    dot.className = 'status-dot live';
+    statusText.textContent = `Live · ${games.length} game${games.length!==1?'s':''} found`;
+
+    if(!games.length){
+      document.getElementById('games-container').innerHTML = '<div class="state-display">No games scheduled for this date.</div>';
+      document.getElementById('rankings-container').innerHTML = '<div class="no-flags">No games today.</div>';
+      document.getElementById('game-count').textContent = '0 games';
+      return;
+    }
+    document.getElementById('game-count').textContent = `${games.length} game${games.length!==1?'s':''}`;
+
+    const teamIds = [...new Set([...games.map(g=>g.home_team.id), ...games.map(g=>g.visitor_team.id)])];
+    const [y,m,d] = dateStr.split('-').map(Number);
+    const endStr   = new Date(y,m-1,d-1,12).toLocaleDateString('en-CA');
+    const startStr = new Date(y,m-1,d-21,12).toLocaleDateString('en-CA');
+    const teamIdsParam = teamIds.map(id=>`team_ids[]=${id}`).join('&');
+    statusText.textContent = 'Fetching team history...';
+
+    let allRecentGames = [];
+    try{
+      const histResp = await apiFetch(`/games?${teamIdsParam}&start_date=${startStr}&end_date=${endStr}&per_page=100`);
+      allRecentGames = histResp.data || [];
+      let cursor = histResp.meta?.next_cursor;
+      while(cursor && allRecentGames.length < 300){
+        const page = await apiFetch(`/games?${teamIdsParam}&start_date=${startStr}&end_date=${endStr}&per_page=100&cursor=${cursor}`);
+        allRecentGames = allRecentGames.concat(page.data || []);
+        cursor = page.meta?.next_cursor;
+        await new Promise(r => setTimeout(r, 500));
+      }
+    } catch(e){ console.warn('History fetch failed:', e.message); }
+
+    const restMap = {};
+    for(const tid of teamIds) restMap[tid] = calcRestFromHistory(allRecentGames, tid, dateStr);
+
+    dot.className = 'status-dot live';
+    statusText.textContent = `Live · ${games.length} games · ${allRecentGames.length} history records`;
+
+    const enriched = games.map(game => {
+      const away = game.visitor_team.abbreviation;
+      const home = game.home_team.abbreviation;
+      const awayRest = restMap[game.visitor_team.id] || {daysRest:1,prevLocation:null,gamesIn4:1,gamesIn6:1,prevTipLocalHr:19.5,prevTipWasLate:false,recentAltitudeVisit:false};
+      const homeRest  = restMap[game.home_team.id]   || {daysRest:1,prevLocation:null,gamesIn4:1,gamesIn6:1,prevTipLocalHr:19.5,prevTipWasLate:false,recentAltitudeVisit:false};
+      const awayF = analyzeFatigue(away, false, awayRest.daysRest, awayRest.prevLocation, home, awayRest.wasHomeLastGame, awayRest.gamesIn4, awayRest.gamesIn6, awayRest.prevTipLocalHr, awayRest.prevTipWasLate, awayRest.recentAltitudeVisit);
+      const homeF = analyzeFatigue(home, true,  homeRest.daysRest, homeRest.prevLocation, home, homeRest.wasHomeLastGame, homeRest.gamesIn4, homeRest.gamesIn6, homeRest.prevTipLocalHr, homeRest.prevTipWasLate, homeRest.recentAltitudeVisit);
+      return {game, awayRest, homeRest, awayF, homeF};
+    });
+
+    // Game cards: sort by tip-off time (earliest first)
+    enriched.sort((a,b) => {
+      const aT = a.game.datetime ? new Date(a.game.datetime).getTime() : Infinity;
+      const bT = b.game.datetime ? new Date(b.game.datetime).getTime() : Infinity;
+      return aT - bT;
+    });
+
+    document.getElementById('games-container').innerHTML =
+      `<div class="games-grid">${enriched.map((e,i) => renderGame(e.game, e.awayRest, e.homeRest, e.awayF, e.homeF, i)).join('')}</div>`;
+
+    renderRankings(enriched);
+
+  } catch(err){
+    dot.className = 'status-dot error';
+    statusText.textContent = `Error: ${err.message}`;
+    document.getElementById('games-container').innerHTML =
+      `<div class="state-display">⚠ ${err.message}<br><br>Check API key or network connection.</div>`;
+    document.getElementById('rankings-container').innerHTML = '<div class="no-flags">Failed to load data.</div>';
+  }
+  document.getElementById('refresh-btn').disabled = false;
+}
+
+function shiftDate(days){
+  const picker = document.getElementById('date-picker');
+  const [y,m,d] = picker.value.split('-').map(Number);
+  picker.value = new Date(y,m-1,d+days,12).toLocaleDateString('en-CA');
+  loadGames();
+}
+
+function init(){
+  const dateStr = todayET();
+  document.getElementById('date-picker').value = dateStr;
+  document.getElementById('header-date').textContent = formatDateDisplay(dateStr);
+  loadGames();
+}
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NBA Edge — Results Logger</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap');
+:root {
+  --bg:#080b10;--surface:#0e1219;--surface2:#141a23;--border:#1e2733;--border2:#2a3545;
+  --accent:#f0c040;--accent2:#40a0f0;--text:#dce8f5;--muted:#5a7090;
+  --green:#30d080;--red:#e03050;--orange:#f07030;--yellow:#f0c040;--critical:#ff1060;
+  --win:#30d080;--loss:#e03050;--push:#5a7090;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-height:100vh;
+  background-image:radial-gradient(ellipse 80% 50% at 50% -20%,rgba(64,160,240,0.06) 0%,transparent 60%);}
+
+.header{padding:20px 32px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:20px;
+  background:rgba(8,11,16,0.95);backdrop-filter:blur(10px);position:sticky;top:0;z-index:100;}
+.logo{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:26px;letter-spacing:3px;color:var(--accent);}
+.logo span{color:var(--accent2);}
+.header-right{margin-left:auto;display:flex;align-items:center;gap:16px;}
+.nav-link{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);text-decoration:none;
+  border:1px solid var(--border);padding:6px 12px;border-radius:4px;letter-spacing:1px;transition:all 0.2s;}
+.nav-link:hover{border-color:var(--accent2);color:var(--accent2);}
+.last-updated{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);}
+
+.main{padding:24px 32px;max-width:1400px;margin:0 auto;}
+
+/* SUMMARY CARDS */
+.summary-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:28px;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px 18px;}
+.stat-label{font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;}
+.stat-value{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:36px;line-height:1;color:var(--text);}
+.stat-sub{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-top:4px;}
+.stat-card.win  .stat-value{color:var(--win);}
+.stat-card.loss .stat-value{color:var(--loss);}
+.stat-card.edge .stat-value{color:var(--accent);}
+
+/* FILTERS */
+.filter-row{display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap;}
+.filter-btn{font-family:'DM Mono',monospace;font-size:10px;padding:6px 14px;border-radius:4px;
+  border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;letter-spacing:1px;transition:all 0.15s;}
+.filter-btn:hover,.filter-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(240,192,64,0.06);}
+.filter-sep{color:var(--border2);font-size:14px;}
+
+/* TABLE */
+.table-wrap{overflow-x:auto;border-radius:8px;border:1px solid var(--border);}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+thead{background:var(--surface2);}
+th{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;color:var(--muted);
+  padding:10px 14px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--border);}
+th.sortable{cursor:pointer;}
+th.sortable:hover{color:var(--accent);}
+th .sort-arrow{margin-left:4px;opacity:0.4;}
+th.sorted .sort-arrow{opacity:1;color:var(--accent);}
+td{padding:10px 14px;border-bottom:1px solid rgba(30,39,51,0.6);white-space:nowrap;vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(20,26,35,0.6);}
+.td-matchup{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;letter-spacing:0.5px;}
+.td-date{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);}
+.td-score{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;}
+.td-fat{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:20px;}
+.td-mono{font-family:'DM Mono',monospace;font-size:11px;}
+.td-line{font-family:'DM Mono',monospace;font-size:12px;color:var(--text);}
+
+/* RESULT BADGES */
+.badge{display:inline-flex;align-items:center;font-family:'Barlow Condensed',sans-serif;font-weight:700;
+  font-size:14px;padding:3px 10px;border-radius:4px;letter-spacing:0.5px;}
+.badge-win {background:rgba(48,208,128,0.12);color:var(--win); border:1px solid rgba(48,208,128,0.3);}
+.badge-loss{background:rgba(224,48,80,0.12); color:var(--loss);border:1px solid rgba(224,48,80,0.3);}
+.badge-push{background:rgba(90,112,144,0.12);color:var(--push);border:1px solid rgba(90,112,144,0.3);}
+.badge-na  {color:var(--muted);font-size:12px;font-family:'DM Mono',monospace;}
+
+/* EDGE PILL */
+.edge-pill{display:inline-flex;font-family:'DM Mono',monospace;font-size:10px;
+  padding:2px 8px;border-radius:3px;letter-spacing:1px;}
+.edge-home{background:rgba(64,160,240,0.12);color:var(--accent2);border:1px solid rgba(64,160,240,0.3);}
+.edge-away{background:rgba(240,112,48,0.12); color:var(--orange); border:1px solid rgba(240,112,48,0.3);}
+.edge-even{background:rgba(90,112,144,0.12); color:var(--muted);  border:1px solid rgba(90,112,144,0.2);}
+.under-pill{background:rgba(200,100,255,0.1);color:#c864ff;border:1px solid rgba(200,100,255,0.3);
+  font-family:'DM Mono',monospace;font-size:9px;padding:1px 6px;border-radius:2px;margin-left:4px;}
+
+.empty-state{text-align:center;padding:80px 20px;color:var(--muted);font-family:'DM Mono',monospace;font-size:13px;}
+
+/* ROI BAR */
+.roi-section{background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  padding:18px 20px;margin-bottom:24px;}
+.roi-title{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;
+  letter-spacing:3px;color:var(--muted);text-transform:uppercase;margin-bottom:14px;}
+.roi-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.roi-block{display:flex;flex-direction:column;gap:6px;}
+.roi-label{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:1px;}
+.roi-stat{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;}
+.roi-bar-wrap{height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:4px;}
+.roi-bar{height:100%;border-radius:2px;transition:width 0.6s ease;}
+.roi-bar.green{background:var(--win);}
+.roi-bar.red{background:var(--loss);}
+
+footer{margin-top:40px;padding:20px 32px;border-top:1px solid var(--border);
+  font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);display:flex;justify-content:space-between;letter-spacing:1px;}
+</style>
+</head>
+<body>
+<header class="header">
+  <div class="logo">NBA<span>EDGE</span> — RESULTS</div>
+  <div class="header-right">
+    <span class="last-updated" id="last-updated">Loading...</span>
+    <a class="nav-link" href="nba_edge_v2.html">← FATIGUE MODEL</a>
+  </div>
+</header>
+
+<div class="main">
+  <!-- SUMMARY -->
+  <div class="summary-row" id="summary-row">
+    <div class="stat-card"><div class="stat-label">Total Flagged</div><div class="stat-value" id="s-total">—</div></div>
+    <div class="stat-card edge"><div class="stat-label">Edge W-L</div><div class="stat-value" id="s-edge-wl">—</div><div class="stat-sub" id="s-edge-pct">—</div></div>
+    <div class="stat-card win"><div class="stat-label">Edge Wins</div><div class="stat-value" id="s-wins">—</div></div>
+    <div class="stat-card loss"><div class="stat-label">Edge Losses</div><div class="stat-value" id="s-losses">—</div></div>
+    <div class="stat-card"><div class="stat-label">Under W-L</div><div class="stat-value" id="s-under-wl">—</div><div class="stat-sub" id="s-under-pct">—</div></div>
+    <div class="stat-card"><div class="stat-label">No Line Data</div><div class="stat-value" id="s-no-line">—</div></div>
+  </div>
+
+  <!-- ROI SECTION -->
+  <div class="roi-section">
+    <div class="roi-title">📊 Model Validation</div>
+    <div class="roi-grid">
+      <div class="roi-block">
+        <div class="roi-label">DIRECTIONAL EDGE ATS (need 50+ samples)</div>
+        <div class="roi-stat" id="roi-edge" style="color:var(--muted)">—</div>
+        <div class="roi-bar-wrap"><div class="roi-bar green" id="roi-edge-bar" style="width:0%"></div></div>
+      </div>
+      <div class="roi-block">
+        <div class="roi-label">BOTH-TIRED UNDER (need 30+ samples)</div>
+        <div class="roi-stat" id="roi-under" style="color:var(--muted)">—</div>
+        <div class="roi-bar-wrap"><div class="roi-bar green" id="roi-under-bar" style="width:0%"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FILTERS -->
+  <div class="filter-row">
+    <button class="filter-btn active" onclick="setFilter('all',this)">ALL</button>
+    <button class="filter-btn" onclick="setFilter('edge',this)">EDGE ONLY</button>
+    <button class="filter-btn" onclick="setFilter('under',this)">BOTH TIRED</button>
+    <span class="filter-sep">|</span>
+    <button class="filter-btn active" id="btn-home" onclick="toggleEdge('home',this)">HOME EDGE</button>
+    <button class="filter-btn active" id="btn-away" onclick="toggleEdge('away',this)">AWAY EDGE</button>
+    <span class="filter-sep">|</span>
+    <button class="filter-btn active" id="btn-win"  onclick="toggleResult('win',this)">WINS</button>
+    <button class="filter-btn active" id="btn-loss" onclick="toggleResult('loss',this)">LOSSES</button>
+    <button class="filter-btn active" id="btn-push" onclick="toggleResult('push',this)">PUSHES</button>
+    <button class="filter-btn active" id="btn-na"   onclick="toggleResult('na',this)">NO LINE</button>
+  </div>
+
+  <!-- TABLE -->
+  <div class="table-wrap">
+    <table id="results-table">
+      <thead>
+        <tr>
+          <th class="sortable" onclick="sortBy('date')">DATE <span class="sort-arrow">↕</span></th>
+          <th>MATCHUP</th>
+          <th>FINAL</th>
+          <th class="sortable" onclick="sortBy('away_fatigue')">AWAY FAT <span class="sort-arrow">↕</span></th>
+          <th class="sortable" onclick="sortBy('home_fatigue')">HOME FAT <span class="sort-arrow">↕</span></th>
+          <th class="sortable" onclick="sortBy('fatigue_diff')">DIFF <span class="sort-arrow">↕</span></th>
+          <th>EDGE</th>
+          <th>SPREAD (DK)</th>
+          <th>TOTAL (DK)</th>
+          <th>ATS</th>
+          <th>O/U</th>
+          <th>EDGE RESULT</th>
+          <th>UNDER RESULT</th>
+        </tr>
+      </thead>
+      <tbody id="results-body">
+        <tr><td colspan="13" class="empty-state">Loading results...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<footer>
+  <span>NBA EDGE MODEL — RESULTS LOGGER</span>
+  <span>DATA: SPORTSGAMEODDS · FATIGUE MODEL v1.1</span>
+  <span>UPDATED NIGHTLY 9AM ET</span>
+</footer>
+
+<script>
+let ALL_GAMES = [];
+let sortKey   = 'date';
+let sortDesc  = true;
+let filterMode = 'all';
+let edgeShow   = new Set(['home','away']);
+let resultShow = new Set(['win','loss','push','na']);
+
+async function loadData() {
+  try {
+    const r = await fetch('data/results.json?_=' + Date.now());
+    const d = await r.json();
+    ALL_GAMES = d.games || [];
+    const meta = d.meta || {};
+    document.getElementById('last-updated').textContent =
+      meta.last_updated ? `Updated: ${meta.last_updated}` : 'No data yet';
+    render();
+  } catch(e) {
+    document.getElementById('results-body').innerHTML =
+      `<tr><td colspan="13" class="empty-state">Failed to load results. ${e.message}</td></tr>`;
+  }
+}
+
+function scoreColor(s) {
+  if(s >= 7) return 'var(--critical)';
+  if(s >= 5) return 'var(--red)';
+  if(s >= 3) return 'var(--orange)';
+  if(s >= 1) return 'var(--yellow)';
+  return 'var(--green)';
+}
+
+function badgeHtml(result) {
+  if(!result) return '<span class="badge-na">—</span>';
+  const r = result.toUpperCase();
+  const cls = r==='WIN'?'win':r==='LOSS'?'loss':'push';
+  return `<span class="badge badge-${cls}">${r}</span>`;
+}
+
+function edgePill(edge) {
+  if(edge === 'HOME') return '<span class="edge-pill edge-home">HOME ↑</span>';
+  if(edge === 'AWAY') return '<span class="edge-pill edge-away">AWAY ↑</span>';
+  return '<span class="edge-pill edge-even">EVEN</span>';
+}
+
+function getResultKey(game) {
+  const r = game.edge_ats;
+  if(!r && !game.close_spread) return 'na';
+  if(!r) return 'na';
+  return r.toLowerCase();
+}
+
+function applyFilters(games) {
+  return games.filter(g => {
+    if(filterMode === 'edge'  && g.edge === 'EVEN') return false;
+    if(filterMode === 'under' && !g.both_tired) return false;
+    const edgeKey = g.edge === 'HOME' ? 'home' : g.edge === 'AWAY' ? 'away' : null;
+    if(edgeKey && !edgeShow.has(edgeKey)) return false;
+    const rKey = getResultKey(g);
+    if(!resultShow.has(rKey)) return false;
+    return true;
+  });
+}
+
+function render() {
+  // Sort
+  const sorted = [...ALL_GAMES].sort((a,b) => {
+    let av = a[sortKey] ?? '', bv = b[sortKey] ?? '';
+    if(typeof av === 'number') return sortDesc ? bv-av : av-bv;
+    return sortDesc ? bv.toString().localeCompare(av.toString()) : av.toString().localeCompare(bv.toString());
+  });
+
+  const filtered = applyFilters(sorted);
+
+  // Summary stats
+  const total = ALL_GAMES.length;
+  const withLine = ALL_GAMES.filter(g => g.edge_ats !== null && g.edge_ats !== undefined);
+  const wins   = withLine.filter(g => g.edge_ats === 'WIN').length;
+  const losses = withLine.filter(g => g.edge_ats === 'LOSS').length;
+  const pushes = withLine.filter(g => g.edge_ats === 'PUSH').length;
+  const noLine = ALL_GAMES.filter(g => g.close_spread === null || g.close_spread === undefined).length;
+
+  const underGames = ALL_GAMES.filter(g => g.both_tired && g.under_result);
+  const underWins  = underGames.filter(g => g.under_result === 'WIN').length;
+  const underLoss  = underGames.filter(g => g.under_result === 'LOSS').length;
+
+  const edgePct  = withLine.length > 0 ? Math.round(wins/(wins+losses)*100) : null;
+  const underPct = underGames.length > 0 ? Math.round(underWins/(underWins+underLoss)*100) : null;
+
+  document.getElementById('s-total').textContent    = total;
+  document.getElementById('s-edge-wl').textContent  = withLine.length ? `${wins}-${losses}` : '—';
+  document.getElementById('s-edge-pct').textContent = edgePct !== null ? `${edgePct}% win rate` : 'Awaiting data';
+  document.getElementById('s-wins').textContent     = wins;
+  document.getElementById('s-losses').textContent   = losses;
+  document.getElementById('s-under-wl').textContent = underGames.length ? `${underWins}-${underLoss}` : '—';
+  document.getElementById('s-under-pct').textContent= underPct !== null ? `${underPct}% win rate` : 'Awaiting data';
+  document.getElementById('s-no-line').textContent  = noLine;
+
+  // ROI bars
+  if(edgePct !== null) {
+    const el = document.getElementById('roi-edge');
+    el.textContent = `${wins}W ${losses}L ${pushes}P — ${edgePct}%`;
+    el.style.color = edgePct >= 55 ? 'var(--win)' : edgePct >= 50 ? 'var(--yellow)' : 'var(--loss)';
+    document.getElementById('roi-edge-bar').style.width = edgePct + '%';
+    document.getElementById('roi-edge-bar').className = 'roi-bar ' + (edgePct >= 50 ? 'green' : 'red');
+  }
+  if(underPct !== null) {
+    const el = document.getElementById('roi-under');
+    el.textContent = `${underWins}W ${underLoss}L — ${underPct}%`;
+    el.style.color = underPct >= 55 ? 'var(--win)' : underPct >= 50 ? 'var(--yellow)' : 'var(--loss)';
+    document.getElementById('roi-under-bar').style.width = underPct + '%';
+    document.getElementById('roi-under-bar').className = 'roi-bar ' + (underPct >= 50 ? 'green' : 'red');
+  }
+
+  // Table
+  const tbody = document.getElementById('results-body');
+  if(!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="13" class="empty-state">${
+      ALL_GAMES.length === 0
+        ? 'No flagged games logged yet. The nightly script runs at 9am ET.'
+        : 'No games match current filters.'
+    }</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(g => {
+    const aSC = scoreColor(g.away_fatigue);
+    const hSC = scoreColor(g.home_fatigue);
+    const spreadDisplay = g.close_spread !== null && g.close_spread !== undefined
+      ? (g.close_spread > 0 ? `HOME +${g.close_spread}` : `HOME ${g.close_spread}`)
+      : '<span style="color:var(--muted)">—</span>';
+    const totalDisplay  = g.close_total !== null && g.close_total !== undefined
+      ? g.close_total : '<span style="color:var(--muted)">—</span>';
+    const underBadge    = g.both_tired ? '<span class="under-pill">BOTH↓</span>' : '';
+
+    return `<tr>
+      <td class="td-date">${g.date}</td>
+      <td class="td-matchup">${g.away} @ ${g.home}${underBadge}</td>
+      <td class="td-score">${g.away_score}–${g.home_score}</td>
+      <td class="td-fat" style="color:${aSC}">${g.away_fatigue.toFixed(1)}</td>
+      <td class="td-fat" style="color:${hSC}">${g.home_fatigue.toFixed(1)}</td>
+      <td class="td-mono" style="color:var(--accent)">${g.fatigue_diff.toFixed(1)}</td>
+      <td>${edgePill(g.edge)}</td>
+      <td class="td-line">${spreadDisplay}</td>
+      <td class="td-line">${totalDisplay}</td>
+      <td class="td-mono">${g.ats_result ? g.ats_result.toUpperCase() : '—'}</td>
+      <td class="td-mono">${g.ou_result  ? g.ou_result.toUpperCase()  : '—'}</td>
+      <td>${badgeHtml(g.edge_ats)}</td>
+      <td>${g.both_tired ? badgeHtml(g.under_result) : '<span class="badge-na">—</span>'}</td>
+    </tr>`;
+  }).join('');
+
+  // Update sort indicators
+  document.querySelectorAll('th.sortable').forEach(th => th.classList.remove('sorted'));
+  document.querySelectorAll('th.sortable').forEach(th => {
+    if(th.getAttribute('onclick').includes(sortKey)) th.classList.add('sorted');
+  });
+}
+
+function sortBy(key) {
+  if(sortKey === key) sortDesc = !sortDesc;
+  else { sortKey = key; sortDesc = true; }
+  render();
+}
+
+function setFilter(mode, btn) {
+  filterMode = mode;
+  document.querySelectorAll('.filter-btn').forEach(b => {
+    if(['all','edge','under'].some(x => b.getAttribute('onclick')?.includes(`'${x}'`)))
+      b.classList.remove('active');
+  });
+  btn.classList.add('active');
+  render();
+}
+
+function toggleEdge(edge, btn) {
+  if(edgeShow.has(edge)) edgeShow.delete(edge); else edgeShow.add(edge);
+  btn.classList.toggle('active', edgeShow.has(edge));
+  render();
+}
+
+function toggleResult(result, btn) {
+  if(resultShow.has(result)) resultShow.delete(result); else resultShow.add(result);
+  btn.classList.toggle('active', resultShow.has(result));
+  render();
+}
+
+loadData();
+</script>
+</body>
+</html>

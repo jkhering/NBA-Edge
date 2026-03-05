@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NBA Edge Model</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;700;800&family=DM+Mono:wght@400;500&display=swap');
+:root{--bg:#080b10;--surface:#0e1219;--border:#1e2733;--accent:#f0c040;--accent2:#40a0f0;--text:#dce8f5;--muted:#5a7090;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Barlow Condensed',sans-serif;min-height:100vh;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background-image:radial-gradient(ellipse 80% 50% at 50% -10%,rgba(64,160,240,0.08) 0%,transparent 60%);}
+.logo{font-size:52px;font-weight:800;letter-spacing:5px;color:var(--accent);line-height:1;margin-bottom:6px;}
+.logo span{color:var(--accent2);}
+.sub{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:3px;margin-bottom:56px;}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:16px;width:100%;max-width:540px;padding:0 20px;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:28px 24px;
+  text-decoration:none;color:var(--text);transition:all 0.2s;display:block;}
+.card:hover{border-color:var(--accent);transform:translateY(-2px);}
+.card-icon{font-size:28px;margin-bottom:12px;}
+.card-title{font-size:22px;font-weight:800;letter-spacing:2px;color:var(--accent);margin-bottom:6px;}
+.card:nth-child(2) .card-title{color:var(--accent2);}
+.card-desc{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:0.5px;line-height:1.6;}
+.version{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-top:40px;letter-spacing:1px;}
+</style>
+</head>
+<body>
+  <div class="logo">NBA<span>EDGE</span></div>
+  <div class="sub">TRAVEL · REST · FATIGUE MODEL v1.1</div>
+  <div class="cards">
+    <a class="card" href="nba_edge_v2.html">
+      <div class="card-icon">⚡</div>
+      <div class="card-title">FATIGUE MODEL</div>
+      <div class="card-desc">Tonight's games · Rest scores · Travel analysis · Edge flags</div>
+    </a>
+    <a class="card" href="results.html">
+      <div class="card-icon">📊</div>
+      <div class="card-title">RESULTS LOGGER</div>
+      <div class="card-desc">Flagged game history · ATS outcomes · Model validation</div>
+    </a>
+  </div>
+  <div class="version">UPDATED NIGHTLY 9AM ET · DATA: BALLDONTLIE + SPORTSGAMEODDS</div>
+</body>
+</html>
