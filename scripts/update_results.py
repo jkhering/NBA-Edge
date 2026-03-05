@@ -318,7 +318,7 @@ def main():
         datetime(*map(int, yesterday.split("-")), 5, 0, 0, tzinfo=timezone.utc)
         - timedelta(days=21)
     ).strftime("%Y-%m-%dT%H:%M:%SZ")
-    yesterday_end_utc = today_end_utc  # same upper bound: yesterday ET + 2 days UTC
+    yesterday_end_utc = yesterday_start_utc  # stop before yesterday's games
     history_events = fetch_all_events({
         "leagueID":     "NBA",
         "finalized":    "true",
@@ -484,8 +484,9 @@ def main():
         # Only log if model flagged it (max score >= 5, diff >= 2)
         FLAG_THRESHOLD = 5
         DIFF_THRESHOLD = 2
-        if max_fat < FLAG_THRESHOLD or abs(diff) < DIFF_THRESHOLD:
-            print(f"  Skip {away} @ {home}: score {max_fat}, diff {abs(diff)} — below threshold")
+        both_tired_check = away_fat >= FLAG_THRESHOLD and home_fat >= FLAG_THRESHOLD
+        if max_fat < FLAG_THRESHOLD or (abs(diff) < DIFF_THRESHOLD and not both_tired_check):
+            print(f"  Skip {away} @ {home}...")
             continue
 
         # Edge direction
