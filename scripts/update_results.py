@@ -526,9 +526,9 @@ def main():
 
         # Edge ATS result
         edge_ats = None
-        if ats_result and edge in ("HOME","AWAY"):
+        if ats_result and edge in ("HOME","AWAY") and not both_tired:
             edge_ats = "WIN" if ats_result == edge.lower() else (
-                       "PUSH" if ats_result == "push" else "LOSS")
+               "PUSH" if ats_result == "push" else "LOSS")
 
         under_result = None
         if both_tired and ou_result:
