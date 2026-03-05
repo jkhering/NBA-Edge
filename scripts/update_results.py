@@ -293,7 +293,7 @@ def main():
     ).strftime("%Y-%m-%dT%H:%M:%SZ")
     today_end_utc = (
         datetime(*map(int, yesterday.split("-")), tzinfo=timezone.utc)
-        + timedelta(days=2)
+        + timedelta(days=1)
     ).strftime("%Y-%m-%dT%H:%M:%SZ")
     events = fetch_all_events({
         "leagueID":      "NBA",
