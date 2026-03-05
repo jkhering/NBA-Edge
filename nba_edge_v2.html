@@ -132,6 +132,20 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-
   padding:10px 16px;font-family:'DM Mono',monospace;font-size:11px;color:var(--yellow);margin-bottom:20px;display:flex;align-items:center;gap:10px;}
 footer{margin-top:40px;padding:20px 32px;border-top:1px solid var(--border);display:flex;justify-content:space-between;
   font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:1px;}
+@media (max-width: 600px) {
+  .header { flex-wrap:wrap; gap:10px; padding:16px; }
+  .header-date { margin-left:0; }
+  .main { padding:16px; }
+  .games-grid { grid-template-columns:1fr; }
+  .team-fatigue-big { font-size:36px; }
+  .team-abbr { font-size:32px; }
+  .score-display { font-size:28px; }
+  .vs-block { font-size:22px; }
+  .date-nav { flex-wrap:wrap; }
+  .date-nav input[type="date"] { width:100%; }
+  .rankings-grid { grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); }
+  .summary-panel { padding:14px; }
+}
 </style>
 </head>
 <body>
