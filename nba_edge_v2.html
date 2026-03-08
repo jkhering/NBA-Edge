@@ -66,6 +66,10 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-
 .rank-card.rc-orange{border-color:rgba(240,112,48,0.35);}
 .rank-card.rc-yellow{border-color:rgba(240,192,64,0.2);}
 .rank-card.rc-green{opacity:0.6;}
+/* Signal-type rank cards */
+.rank-card.rc-spread{border-color:rgba(48,208,128,0.45);background:rgba(48,208,128,0.04);}
+.rank-card.rc-under-2{border-color:rgba(240,192,64,0.45);background:rgba(240,192,64,0.04);}
+.rank-card.rc-under-3{border-color:rgba(255,16,96,0.5);background:rgba(255,16,96,0.05);}
 .rank-num{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);min-width:14px;text-align:right;}
 .rank-body{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;}
 .rank-team{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:32px;letter-spacing:1px;color:var(--text);line-height:1;}
@@ -75,6 +79,8 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-
 .rank-pill-btb{background:rgba(240,112,48,0.15);color:var(--orange);border:1px solid rgba(240,112,48,0.3);}
 .rank-pill-density{background:rgba(200,100,255,0.12);color:#c864ff;border:1px solid rgba(200,100,255,0.3);}
 .rank-score{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:32px;letter-spacing:0;line-height:1;margin-left:auto;flex-shrink:0;}
+.rank-signal{font-family:'DM Mono',monospace;font-size:11px;font-weight:500;letter-spacing:0.5px;margin-left:auto;flex-shrink:0;text-align:right;line-height:1.4;}
+.rank-signal-note{font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);margin-top:2px;}
 .no-flags{font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);padding:12px 0;}
 
 /* GAMES GRID */
@@ -84,8 +90,6 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-
 .game-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;
   transition:border-color 0.2s,transform 0.15s;animation:fadeUp 0.4s ease both;}
 .game-card:hover{transform:translateY(-2px);border-color:var(--border2);}
-.game-card.flag-poor{border-color:rgba(240,112,48,0.5);}
-.game-card.flag-critical{border-color:rgba(255,16,96,0.6);box-shadow:0 0 20px rgba(255,16,96,0.1);}
 @keyframes fadeUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
 
 /* TIP BAR */
@@ -121,11 +125,18 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-
 .tier-badge-sm.average{color:var(--yellow);}.tier-badge-sm.poor{color:var(--orange);}.tier-badge-sm.critical{color:var(--critical);}
 .tier-detail{font-size:12px;color:var(--muted);font-weight:300;}
 
-/* EDGE FLAG */
-.edge-flag{padding:8px 14px;background:var(--surface2);border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;font-size:14px;}
-.edge-flag.no-edge{color:var(--muted);}.edge-flag.slight{color:var(--yellow);}
-.edge-flag.moderate{color:var(--orange);}.edge-flag.strong{color:var(--red);}
-.edge-icon{font-size:14px;}
+/* GAME CARD SIGNAL BORDERS */
+.game-card.signal-spread{border-color:rgba(48,208,128,0.55);}
+.game-card.signal-under-2{border-color:rgba(240,192,64,0.55);}
+.game-card.signal-under-3{border-color:rgba(255,16,96,0.6);box-shadow:0 0 20px rgba(255,16,96,0.1);}
+
+/* SIGNAL STRIP */
+.signal-strip{padding:8px 14px;background:var(--surface2);border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;font-size:13px;font-family:'DM Mono',monospace;letter-spacing:0.5px;}
+.signal-strip.signal-spread{color:var(--green);}
+.signal-strip.signal-under-2{color:var(--yellow);}
+.signal-strip.signal-under-3{color:var(--critical);}
+.signal-strip.signal-info{color:var(--muted);font-size:11px;}
+.signal-note{font-size:10px;color:var(--muted);margin-left:4px;}
 
 /* MISC */
 .test-banner{background:rgba(240,192,64,0.08);border:1px solid rgba(240,192,64,0.2);border-radius:6px;
@@ -152,7 +163,7 @@ footer{margin-top:40px;padding:20px 32px;border-top:1px solid var(--border);disp
 <header class="header">
   <a class="logo" href="https://old-head-dev.github.io/NBA-Edge/" style="text-decoration:none;">NBA<span>EDGE</span></a>
   <div class="header-meta">
-    <div class="version">v1.1 — ALTITUDE</div>
+    <div class="version">v2.0 — BETTING SIGNALS</div>
     <div class="api-status">
       <div class="status-dot" id="status-dot"></div>
       <span id="status-text">Connecting...</span>
@@ -170,9 +181,9 @@ footer{margin-top:40px;padding:20px 32px;border-top:1px solid var(--border);disp
     <button class="date-btn" onclick="shiftDate(1)">NEXT →</button>
   </div>
 
-  <!-- FATIGUE RANKINGS -->
+  <!-- BETTING EDGES PANEL -->
   <div class="summary-panel">
-    <div class="summary-title">⚡ Fatigue Rankings — Tonight</div>
+    <div class="summary-title">⚡ Tonight's Betting Edges</div>
     <div id="rankings-container"><div class="no-flags">Loading...</div></div>
   </div>
 
@@ -187,8 +198,8 @@ footer{margin-top:40px;padding:20px 32px;border-top:1px solid var(--border);disp
 </div>
 
 <footer>
-  <span>NBA EDGE MODEL v1.1</span>
-  <span>PHASE 1 — TRAVEL & REST ENGINE</span>
+  <span>NBA EDGE MODEL v2.0</span>
+  <span>PHASE 2 — BETTING SIGNAL ENGINE</span>
   <span>DATA: BALLDONTLIE.IO (FREE TIER)</span>
 </footer>
 
@@ -381,7 +392,7 @@ function estimateBTBSleep(fromArena, toArena, prevTipLocalHr = 20.0){
 
 // ── COMPOSITE FATIGUE SCORE (0–10) ────────────────────────────────
 // BTB base: A=5 (away→away), C=4 (away→home), B=3 (home→away), home-home=2
-// Sleep modifier (BTB only): <4hrs +4, 4–5.9hrs +2, 6–6.9hrs +1, ≥7hrs +0
+// Sleep modifier (BTB only): <2hrs +5, 2–3.9hrs +3, 4–5.9hrs +2, 6–6.9hrs +1, ≥7hrs +0
 // Eastbound tz penalty: +0.5/hr crossed (max +1.5) — eastbound = positive tzDelta
 // Prev game late tip (BTB only): prev tip ≥ 9:30pm local → +0.5
 //   (later finish = later charter = less sleep)
@@ -390,7 +401,7 @@ function computeFatigueScore(scenario, isBTB, effectiveSleep, tzDelta, prevTipWa
   let base = 0;
   if(isBTB) base = scenario==='A' ? 5 : scenario==='C' ? 4 : scenario==='B' ? 3 : 2;
   const sleepMod = (isBTB && effectiveSleep !== null)
-    ? (effectiveSleep < 4 ? 4 : effectiveSleep < 6 ? 2 : effectiveSleep < 7 ? 1 : 0) : 0;
+    ? (effectiveSleep < 2 ? 5 : effectiveSleep < 4 ? 3 : effectiveSleep < 6 ? 2 : effectiveSleep < 7 ? 1 : 0) : 0;
   const tzMod = tzDelta > 0 ? Math.min(tzDelta * 0.5, 1.5) : 0; // eastbound = positive tzDelta = losing hours
   const lateMod = (isBTB && prevTipWasLate) ? 0.5 : 0;
   const densityMod = densityTag==='4-in-6' ? 2 : densityTag==='3-in-4' ? 1 : 0;
@@ -586,18 +597,72 @@ function calcRestFromHistory(games, teamId, targetDate){
     prevTipLocalHr, prevTipWasLate, recentAltitudeVisit};
 }
 
-// ── EDGE LABEL ────────────────────────────────────────────────────
-function getEdgeInfo(awayF, homeF){
-  const diff = awayF.fatigueScore - homeF.fatigueScore;
-  const abs  = Math.abs(diff);
-  // diff > 0 means away is more fatigued → home has the edge
-  // diff < 0 means home is more fatigued → away has the edge
-  const isHomeEdge = diff > 0;
-  const who = isHomeEdge ? 'Home edge' : 'Away edge';
-  if(abs < 2)   return {label:'—', cls:'no-edge', icon:'', isHomeEdge: null};
-  if(abs < 2.5) return {label:`Slight — ${who} (${abs.toFixed(1)})`,   cls:'slight',   icon:'▲', isHomeEdge};
-  if(abs < 4.5) return {label:`Moderate — ${who} (${abs.toFixed(1)})`, cls:'moderate', icon:'▲▲', isHomeEdge};
-  return            {label:`Strong — ${who} (${abs.toFixed(1)})`,      cls:'strong',   icon:'▲▲▲', isHomeEdge};
+// ── BETTING SIGNAL ENGINE ─────────────────────────────────────────
+// Rules derived from combined 24-25 + 25-26 backtest (n=470 ATS, n=82 under).
+//
+// SPREAD — AWAY EDGE:
+//   Home team BTB (non-B scenario), delta >= 4 → Bet Away +
+//   Note: home-favored condition cannot be verified without odds feed (v3.0).
+//   Signal fires unconditionally; user must confirm home is favored.
+//
+// UNDER — BOTH TIRED:
+//   Both teams >= 5 fatigue + away=Scenario A (road-trip BTB)
+//   Home=home-home OR home=C → Bet Under +++ (70-79% combined)
+//   All other home scenarios → Bet Under ++ (70% combined)
+//   Away=B both-tired: no signal (52% — coin flip)
+//
+// HOME EDGE (away more fatigued): informational only — books price Scenario A road-trip BTB.
+//   No bet signal. Show muted note.
+//
+// Density-only paths: density contributes to displayed score but isBTB gate
+//   prevents density-only games from triggering any signal.
+//
+// ── BETTING SIGNAL ENGINE ─────────────────────────────────────────
+// Returns an ARRAY — a game can fire both spread AND under simultaneously.
+// e.g. Away=A (fatigued road team) + Home=C with score >= 5 and delta >= 4
+// fires both an under signal (both tired + Away=A) and a spread signal
+// (home more fatigued, BTB non-B, delta >= 4).
+//
+// Spread:  home BTB non-B, home more fatigued, delta >= 4 → Bet Away +
+// Under:   both >= 5, away=Scenario A → Bet Under ++/+++
+// Info:    away more fatigued, away BTB, delta >= 2, no actionable signal → muted note
+//
+function getBettingSignals(awayF, homeF){
+  const signals = [];
+  const diff  = awayF.fatigueScore - homeF.fatigueScore; // + = away worse, - = home worse
+  const delta = Math.abs(diff);
+
+  // UNDER signal: both tired (>= 5), away = Scenario A (road-trip BTB only — B excluded)
+  if(awayF.fatigueScore >= 5 && homeF.fatigueScore >= 5 && awayF.isBTB && awayF.scenario === 'A'){
+    const strongCombo = homeF.scenario === 'home-home' || homeF.scenario === 'C';
+    const conf = strongCombo ? '+++' : '++';
+    signals.push({
+      type:'under', confidence:conf,
+      label:`▼ Bet Under ${conf}`,
+      cls: conf === '+++' ? 'signal-under-3' : 'signal-under-2',
+    });
+  }
+
+  // SPREAD signal: home more fatigued, home BTB non-B, delta >= 4
+  if(diff < 0 && delta >= 4 && homeF.isBTB && homeF.scenario !== 'B'){
+    signals.push({
+      type:'spread',
+      label:'▲ Bet Away +',
+      note:'if home is favored',
+      cls:'signal-spread',
+    });
+  }
+
+  // HOME EDGE info: away more fatigued + away BTB + delta >= 2, no actionable signals fired
+  if(signals.length === 0 && diff > 0 && delta >= 2 && awayF.isBTB){
+    signals.push({
+      type:'info',
+      label:'No Home edge — spread likely priced in',
+      cls:'signal-info',
+    });
+  }
+
+  return signals;
 }
 
 // ── RENDER GAME CARD ──────────────────────────────────────────────
@@ -607,9 +672,7 @@ function renderGame(game, awayRest, homeRest, awayF, homeF, idx){
   const tipDisplay = formatTipTime(game.datetime);
   const awayMeta = TIER_META[awayF.tier];
   const homeMeta = TIER_META[homeF.tier];
-  const edge = getEdgeInfo(awayF, homeF);
-  const maxScore = Math.max(awayF.fatigueScore, homeF.fatigueScore);
-  const cardClass = maxScore >= 7 ? 'flag-critical' : maxScore >= 5 ? 'flag-poor' : '';
+  const signals = getBettingSignals(awayF, homeF);
   const isLive  = game.status && game.status !== 'Final' && !game.status.includes(':');
   const isFinal = game.status === 'Final';
   const statusDisplay = isLive
@@ -643,8 +706,32 @@ function renderGame(game, awayRest, homeRest, awayF, homeF, idx){
   const homeSleepLine = homeF.sleepDetail
     ? `<div class="tier-detail" style="font-size:12px;color:var(--orange);margin-top:2px">💤 ${homeF.sleepDetail}</div>` : '';
 
+  // Card border priority: under-3 > under-2 > spread > none
+  let cardCls = '';
+  if(signals.some(s => s.cls === 'signal-under-3'))      cardCls = 'signal-under-3';
+  else if(signals.some(s => s.cls === 'signal-under-2')) cardCls = 'signal-under-2';
+  else if(signals.some(s => s.type === 'spread'))        cardCls = 'signal-spread';
+
+  // Render all signal strips
+  const signalStrips = signals.map(sig => {
+    if(sig.type === 'spread'){
+      return `<div class="signal-strip signal-spread" style="justify-content:flex-start;">
+        <span>${sig.label}</span><span class="signal-note">· ${sig.note}</span>
+      </div>`;
+    } else if(sig.type === 'under'){
+      return `<div class="signal-strip ${sig.cls}" style="justify-content:center;">
+        <span>${sig.label}</span>
+      </div>`;
+    } else if(sig.type === 'info'){
+      return `<div class="signal-strip signal-info" style="justify-content:center;">
+        <span>${sig.label}</span>
+      </div>`;
+    }
+    return '';
+  }).join('');
+
   return `
-    <div class="game-card ${cardClass}" style="animation-delay:${idx*0.06}s">
+    <div class="game-card ${cardCls}" style="animation-delay:${idx*0.06}s">
       <div class="tip-bar"><span class="tip-time">${tipDisplay}</span>${statusDisplay}</div>
       <div class="matchup">
         <div class="team-side away">
@@ -673,60 +760,76 @@ function renderGame(game, awayRest, homeRest, awayF, homeF, idx){
           ${homeSleepLine}
         </div>
       </div>
-      <div class="edge-flag ${edge.cls}" style="${edge.isHomeEdge === true ? 'justify-content:flex-end;' : edge.isHomeEdge === false ? 'justify-content:flex-start;' : 'justify-content:center;'}">
-        ${edge.icon ? `<span class="edge-icon">${edge.icon}</span>` : ''}
-        <span>${edge.label}</span>
-      </div>
+      ${signalStrips}
     </div>`;
 }
 
-// ── RENDER RANKINGS PANEL ─────────────────────────────────────────
-// All teams playing tonight, sorted high→low by fatigue score.
-function renderRankings(enriched){
-  const entries = [];
+// ── RENDER BETTING EDGES PANEL ────────────────────────────────────
+// One panel card per signal per game — a game with both spread and under
+// signals fires two separate cards in the panel.
+function renderBettingEdges(enriched){
+  const panelCards = [];
+  let cardNum = 0;
+
   enriched.forEach(({game, awayF, homeF}) => {
     const away = game.visitor_team.abbreviation;
     const home = game.home_team.abbreviation;
-    const matchup = `${away}@${home}`;
-    entries.push({abbr:away, f:awayF, matchup, role:'AWAY', opp:home});
-    entries.push({abbr:home, f:homeF, matchup, role:'HOME', opp:away});
+    const signals = getBettingSignals(awayF, homeF);
+
+    signals.forEach(signal => {
+      if(signal.type !== 'spread' && signal.type !== 'under') return;
+      cardNum++;
+
+      if(signal.type === 'under'){
+        const conf = signal.confidence;
+        const cardCls = conf === '+++' ? 'rc-under-3' : 'rc-under-2';
+        const labelColor = conf === '+++' ? 'var(--critical)' : 'var(--yellow)';
+        const homeScen = homeF.scenario === 'home-home' ? 'H-H'
+          : homeF.scenario === 'C' ? 'A→H'
+          : homeF.scenario === 'B' ? 'H→A'
+          : homeF.scenario === 'A' ? 'road' : 'home';
+        panelCards.push(`
+          <div class="rank-card ${cardCls}">
+            <div class="rank-num">${cardNum}</div>
+            <div class="rank-body">
+              <div class="rank-team" style="font-size:18px;letter-spacing:0.5px">${away} @ ${home}</div>
+              <div class="rank-meta">Away: road trip · Home: ${homeScen}</div>
+              <div class="rank-pills">
+                <span class="rank-pill rank-pill-btb">BTB</span>
+                <span class="rank-pill" style="background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.1);color:var(--muted)">UNDER</span>
+              </div>
+            </div>
+            <div class="rank-signal" style="color:${labelColor}">
+              <div>${conf}</div>
+              <div class="rank-signal-note">BET UNDER</div>
+            </div>
+          </div>`);
+      } else {
+        panelCards.push(`
+          <div class="rank-card rc-spread">
+            <div class="rank-num">${cardNum}</div>
+            <div class="rank-body">
+              <div class="rank-team">${away}</div>
+              <div class="rank-meta">@ ${home} · home BTB</div>
+              <div class="rank-pills">
+                <span class="rank-pill" style="background:rgba(48,208,128,0.12);border:1px solid rgba(48,208,128,0.3);color:var(--green)">SPREAD</span>
+              </div>
+            </div>
+            <div class="rank-signal" style="color:var(--green)">
+              <div>+</div>
+              <div class="rank-signal-note">BET AWAY<br><span style="color:var(--muted)">if home fav</span></div>
+            </div>
+          </div>`);
+      }
+    });
   });
 
-  entries.sort((a,b) => b.f.fatigueScore - a.f.fatigueScore || a.abbr.localeCompare(b.abbr));
-
-  // Only show teams with meaningful fatigue (score ≥ 4)
-  const flagged = entries.filter(e => e.f.fatigueScore >= 4);
-
   const el = document.getElementById('rankings-container');
-  if(!flagged.length){
-    el.innerHTML = '<div class="no-flags">No significant fatigue tonight — all teams score below 4.0.</div>';
+  if(!panelCards.length){
+    el.innerHTML = '<div class="no-flags">No verified betting edges tonight.</div>';
     return;
   }
-
-  const cards = flagged.map((e, i) => {
-    const sc  = scoreColor(e.f.fatigueScore);
-    const cls = rankCardClass(e.f.fatigueScore);
-    const btbPill      = e.f.isBTB           ? '<span class="rank-pill rank-pill-btb">BTB</span>'            : '';
-    const densityPill  = e.f.densityTag      ? `<span class="rank-pill rank-pill-density">${e.f.densityTag}</span>` : '';
-    const altPill      = e.f.altitudePenalty ? '<span class="rank-pill" style="background:rgba(64,160,240,0.12);border:1px solid rgba(64,160,240,0.35);color:#40a0f0">ALT</span>' : '';
-    const scenarioLabel = e.f.scenario === 'A' ? 'road'
-      : e.f.scenario === 'B' ? 'H→A'
-      : e.f.scenario === 'C' ? 'A→H'
-      : e.f.scenario === 'home-home' ? 'H-H'
-      : e.role.toLowerCase();
-    return `
-      <div class="rank-card ${cls}">
-        <div class="rank-num">${i+1}</div>
-        <div class="rank-body">
-          <div class="rank-team">${e.abbr}</div>
-          <div class="rank-meta">vs ${e.opp} · ${scenarioLabel}</div>
-          <div class="rank-pills">${btbPill}${densityPill}${altPill}</div>
-        </div>
-        <div class="rank-score" style="color:${sc}">${e.f.fatigueScore.toFixed(1)}</div>
-      </div>`;
-  }).join('');
-
-  el.innerHTML = `<div class="rankings-grid">${cards}</div>`;
+  el.innerHTML = `<div class="rankings-grid">${panelCards.join('')}</div>`;
 }
 
 // ── MAIN LOAD ─────────────────────────────────────────────────────
@@ -803,7 +906,7 @@ async function loadGames(){
     document.getElementById('games-container').innerHTML =
       `<div class="games-grid">${enriched.map((e,i) => renderGame(e.game, e.awayRest, e.homeRest, e.awayF, e.homeF, i)).join('')}</div>`;
 
-    renderRankings(enriched);
+    renderBettingEdges(enriched);
 
   } catch(err){
     dot.className = 'status-dot error';
