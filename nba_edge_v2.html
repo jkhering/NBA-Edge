@@ -73,7 +73,7 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-
 .rank-num{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);min-width:14px;text-align:right;}
 .rank-body{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;}
 .rank-team{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:32px;letter-spacing:1px;color:var(--text);line-height:1;}
-.rank-meta{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rank-meta{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);white-space:normal;line-height:1.4;}
 .rank-pills{display:flex;gap:3px;margin-top:2px;flex-wrap:wrap;}
 .rank-pill{font-family:'DM Mono',monospace;font-size:12px;padding:1px 4px;border-radius:2px;}
 .rank-pill-btb{background:rgba(240,112,48,0.15);color:var(--orange);border:1px solid rgba(240,112,48,0.3);}
@@ -792,7 +792,7 @@ function renderBettingEdges(enriched){
           <div class="rank-card ${cardCls}">
             <div class="rank-num">${cardNum}</div>
             <div class="rank-body">
-              <div class="rank-team" style="font-size:18px;letter-spacing:0.5px">${away} @ ${home}</div>
+              <div class="rank-team" style="font-size:15px;letter-spacing:0.5px">${away} @ ${home}</div>
               <div class="rank-meta">Away: road trip · Home: ${homeScen}</div>
               <div class="rank-pills">
                 <span class="rank-pill rank-pill-btb">BTB</span>
