@@ -124,7 +124,8 @@ def compute_fatigue_score(scenario, is_btb, effective_sleep, tz_delta, prev_late
         base = {"A":5,"C":4,"B":3,"home-home":2}.get(scenario, 2)
     sleep_mod = 0
     if is_btb and effective_sleep is not None:
-        if   effective_sleep < 4: sleep_mod = 4
+        if   effective_sleep < 2: sleep_mod = 5
+        elif effective_sleep < 4: sleep_mod = 3
         elif effective_sleep < 6: sleep_mod = 2
         elif effective_sleep < 7: sleep_mod = 1
     tz_mod      = min(tz_delta * 0.5, 1.5) if tz_delta > 0 else 0
@@ -190,6 +191,28 @@ def analyze_fatigue(team, is_home, days_rest, prev_arena, home_team, was_home_la
     adj = max(0, s["total"])
     score = compute_fatigue_score("A", True, adj, s["tz_delta"], prev_late, density_tag, alt_penalty)
     return {"score": score, "scenario": "A", "detail": f"BTB road trip · {s['dist']}mi", "is_btb": True, "sleep": round(adj,1)}
+
+def get_betting_signals(away_f, home_f):
+    """
+    Mirrors getBettingSignals() in nba_edge_v2.html exactly.
+    Returns a list of dicts — can contain both 'spread' and 'under'.
+    """
+    signals = []
+    diff  = away_f["score"] - home_f["score"]  # positive = away worse
+    delta = abs(diff)
+
+    # UNDER signal: both >= 5, away = Scenario A (road-trip BTB only)
+    if (away_f["score"] >= 5 and home_f["score"] >= 5
+            and away_f.get("is_btb") and away_f.get("scenario") == "A"):
+        strong = home_f.get("scenario") in ("home-home", "C")
+        signals.append({"type": "under", "confidence": "+++" if strong else "++"})
+
+    # SPREAD signal: home more fatigued (diff < 0), home BTB non-B, delta >= 4
+    if (diff < 0 and delta >= 4
+            and home_f.get("is_btb") and home_f.get("scenario") != "B"):
+        signals.append({"type": "spread"})
+
+    return signals
 
 # ── SGO FETCH HELPERS ─────────────────────────────────────────────
 
@@ -481,15 +504,18 @@ def main():
         max_fat  = max(away_fat, home_fat)
         diff     = round(away_fat - home_fat, 1)  # positive = away more fatigued = home edge
 
-        # Only log if model flagged it (max score >= 5, diff >= 2)
-        FLAG_THRESHOLD = 5
-        DIFF_THRESHOLD = 2
-        both_tired_check = away_fat >= FLAG_THRESHOLD and home_fat >= FLAG_THRESHOLD
-        if max_fat < FLAG_THRESHOLD or (abs(diff) < DIFF_THRESHOLD and not both_tired_check):
+        # Only log if a v2.0 betting signal fires
+        signals = get_betting_signals(away_f, home_f)
+        if not signals:
             print(f"  Skip {away} @ {home}...")
             continue
 
-        # Edge direction
+        signal_types = [s["type"] for s in signals]
+        has_spread = "spread" in signal_types
+        has_under  = "under"  in signal_types
+        signal_type = "both" if (has_spread and has_under) else signal_types[0]
+
+        # Edge direction (kept for display/legacy)
         if diff > 0:
             edge = "HOME"
             flagged_team = away
@@ -500,14 +526,13 @@ def main():
             edge = "EVEN"
             flagged_team = ""
 
-        # Both tired under flag
-        both_tired = away_fat >= FLAG_THRESHOLD and home_fat >= FLAG_THRESHOLD
+        # Both tired flag (raw, for display)
+        both_tired = away_fat >= 5 and home_fat >= 5
 
-        # Outcomes — compute_outcomes reads closeSpread/closeOverUnder/score
-        # from the odd object top level (not byBookmaker).
+        # Outcomes
         outcomes = compute_outcomes(event)
 
-        # ATS: home covers if (home_score - away_score) + close_spread > 0
+        # ATS grading
         ats_result = None
         close_spread = outcomes["close_spread"]
         if close_spread is not None:
@@ -515,7 +540,7 @@ def main():
             net = margin + close_spread
             ats_result = "push" if net == 0 else ("home" if net > 0 else "away")
 
-        # O/U: use score from odd if available, else compute from final scores
+        # O/U grading
         ou_result = outcomes["ou_result"]
         close_total = outcomes["close_total"]
         if ou_result is None and close_total is not None:
@@ -524,15 +549,17 @@ def main():
             elif total_final < close_total: ou_result = "under"
             else:                           ou_result = "push"
 
-        # Edge ATS result
+        # Spread bet result: bet is on AWAY team (AWAY EDGE signal)
         edge_ats = None
-        if ats_result and edge in ("HOME","AWAY") and not both_tired:
-            edge_ats = "WIN" if ats_result == edge.lower() else (
-               "PUSH" if ats_result == "push" else "LOSS")
+        if has_spread and ats_result:
+            edge_ats = "WIN" if ats_result == "away" else (
+                "PUSH" if ats_result == "push" else "LOSS")
 
+        # Under bet result
         under_result = None
-        if both_tired and ou_result:
-            under_result = "WIN" if ou_result == "under" else ("PUSH" if ou_result == "push" else "LOSS")
+        if has_under and ou_result:
+            under_result = "WIN" if ou_result == "under" else (
+                "PUSH" if ou_result == "push" else "LOSS")
 
         starts_at = event["status"].get("startsAt","")
 
@@ -555,6 +582,7 @@ def main():
             "edge":          edge,
             "flagged_team":  flagged_team,
             "both_tired":    both_tired,
+            "signal_type":   signal_type,
             "close_spread":  close_spread,
             "close_total":   close_total,
             "ats_result":    ats_result,
@@ -564,7 +592,7 @@ def main():
         }
 
         new_games.append(rec)
-        print(f"  LOGGED: {away} @ {home} | away={away_fat} home={home_fat} edge={edge} | ATS={edge_ats} OU={ou_result}")
+        print(f"  LOGGED: {away} @ {home} | signal={signal_type} | away={away_fat} home={home_fat} | ATS={edge_ats} OU={under_result}")
 
     if new_games:
         existing["games"].extend(new_games)
