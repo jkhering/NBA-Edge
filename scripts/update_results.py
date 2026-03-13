@@ -2,20 +2,28 @@
 """
 NBA Edge Model — Nightly Results Logger
 Runs via GitHub Actions at 9am ET daily.
-Pulls previous day's finalized NBA games from SGO,
+Pulls previous day's finalized NBA games from BallDontLie,
+fetches closing lines from The Odds API,
 computes ATS/OU outcomes for fatigue-flagged games,
 appends to data/results.json.
 """
 
 import os
 import json
+import time as _time
 import requests
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-SGO_KEY = os.environ["SGO_API_KEY"]
-BASE    = "https://api.sportsgameodds.com/v2"
-HEADERS = {"x-api-key": SGO_KEY}
+SGO_KEY  = None  # SGO disabled — using BDL + The Odds API
+BDL_KEY  = os.environ["BDL_API_KEY"]
+ODDS_KEY = os.environ["ODDS_API_KEY"]
+
+BDL_BASE  = "https://api.balldontlie.io/v1"
+ODDS_BASE = "https://api.the-odds-api.com/v4"
+SPORT     = "basketball_nba"
+
+BDL_HEADERS  = {"Authorization": BDL_KEY}
 
 ET = ZoneInfo("America/New_York")
 
@@ -56,23 +64,23 @@ ARENAS = {
 }
 ALTITUDE_ARENAS = {"DEN", "UTA"}
 
-# Map SGO teamID suffixes to our abbreviations
-SGO_TEAM_MAP = {
-    "ATLANTA_HAWKS_NBA": "ATL", "BOSTON_CELTICS_NBA": "BOS",
-    "BROOKLYN_NETS_NBA": "BKN", "CHARLOTTE_HORNETS_NBA": "CHA",
-    "CHICAGO_BULLS_NBA": "CHI", "CLEVELAND_CAVALIERS_NBA": "CLE",
-    "DALLAS_MAVERICKS_NBA": "DAL", "DENVER_NUGGETS_NBA": "DEN",
-    "DETROIT_PISTONS_NBA": "DET", "GOLDEN_STATE_WARRIORS_NBA": "GSW",
-    "HOUSTON_ROCKETS_NBA": "HOU", "INDIANA_PACERS_NBA": "IND",
-    "LOS_ANGELES_CLIPPERS_NBA": "LAC", "LOS_ANGELES_LAKERS_NBA": "LAL",
-    "MEMPHIS_GRIZZLIES_NBA": "MEM", "MIAMI_HEAT_NBA": "MIA",
-    "MILWAUKEE_BUCKS_NBA": "MIL", "MINNESOTA_TIMBERWOLVES_NBA": "MIN",
-    "NEW_ORLEANS_PELICANS_NBA": "NOP", "NEW_YORK_KNICKS_NBA": "NYK",
-    "OKLAHOMA_CITY_THUNDER_NBA": "OKC", "ORLANDO_MAGIC_NBA": "ORL",
-    "PHILADELPHIA_76ERS_NBA": "PHI", "PHOENIX_SUNS_NBA": "PHX",
-    "PORTLAND_TRAIL_BLAZERS_NBA": "POR", "SACRAMENTO_KINGS_NBA": "SAC",
-    "SAN_ANTONIO_SPURS_NBA": "SAS", "TORONTO_RAPTORS_NBA": "TOR",
-    "UTAH_JAZZ_NBA": "UTA", "WASHINGTON_WIZARDS_NBA": "WAS",
+# Full team names for The Odds API matching
+TEAM_NAMES = {
+    "ATL":"Atlanta Hawks",          "BOS":"Boston Celtics",
+    "BKN":"Brooklyn Nets",          "CHA":"Charlotte Hornets",
+    "CHI":"Chicago Bulls",          "CLE":"Cleveland Cavaliers",
+    "DAL":"Dallas Mavericks",       "DEN":"Denver Nuggets",
+    "DET":"Detroit Pistons",        "GSW":"Golden State Warriors",
+    "HOU":"Houston Rockets",        "IND":"Indiana Pacers",
+    "LAC":"Los Angeles Clippers",   "LAL":"Los Angeles Lakers",
+    "MEM":"Memphis Grizzlies",      "MIA":"Miami Heat",
+    "MIL":"Milwaukee Bucks",        "MIN":"Minnesota Timberwolves",
+    "NOP":"New Orleans Pelicans",   "NYK":"New York Knicks",
+    "OKC":"Oklahoma City Thunder",  "ORL":"Orlando Magic",
+    "PHI":"Philadelphia 76ers",     "PHX":"Phoenix Suns",
+    "POR":"Portland Trail Blazers", "SAC":"Sacramento Kings",
+    "SAS":"San Antonio Spurs",      "TOR":"Toronto Raptors",
+    "UTA":"Utah Jazz",              "WAS":"Washington Wizards",
 }
 
 def haversine(lat1, lon1, lat2, lon2):
@@ -214,101 +222,111 @@ def get_betting_signals(away_f, home_f):
 
     return signals
 
-# ── SGO FETCH HELPERS ─────────────────────────────────────────────
+# ── BDL FETCH HELPERS ────────────────────────────────────────────
 
-def sgo_get(endpoint, params, retries=4, backoff=15):
-    import time
-    for attempt in range(retries):
-        r = requests.get(f"{BASE}{endpoint}", headers=HEADERS, params=params, timeout=20)
-        if r.status_code == 429:
-            wait = backoff * (2 ** attempt)
-            print(f"  429 rate limit — waiting {wait}s before retry {attempt+1}/{retries}")
-            time.sleep(wait)
-            continue
+def bdl_get(endpoint, params):
+    r = requests.get(f"{BDL_BASE}{endpoint}", headers=BDL_HEADERS, params=params, timeout=20)
+    r.raise_for_status()
+    return r.json()
+
+def fetch_bdl_games(date_str):
+    """Fetch all finalized NBA games for a given date (YYYY-MM-DD)."""
+    data = bdl_get("/games", {"dates[]": date_str, "per_page": 100})
+    return [g for g in data.get("data", []) if g.get("status") == "Final"]
+
+def fetch_bdl_history(start_date_str, end_date_str):
+    """Fetch all games between two dates for fatigue history."""
+    from datetime import date
+    start = date.fromisoformat(start_date_str)
+    end   = date.fromisoformat(end_date_str)
+    dates = []
+    cur = start
+    while cur < end:
+        dates.append(cur.isoformat())
+        cur += timedelta(days=1)
+
+    all_games = []
+    chunk = 7  # one week at a time to stay within param limits
+    for i in range(0, len(dates), chunk):
+        batch = dates[i:i+chunk]
+        params = [("dates[]", d) for d in batch] + [("per_page", 100)]
+        r = requests.get(f"{BDL_BASE}/games", headers=BDL_HEADERS, params=params, timeout=20)
         r.raise_for_status()
-        return r.json()
-    raise Exception(f"SGO API rate limit exceeded after {retries} retries for {endpoint}")
+        all_games.extend(r.json().get("data", []))
+        _time.sleep(1)  # stay under BDL rate limit
+    return all_games
 
-def fetch_all_events(params):
-    import time
-    events = []
-    cursor = None
-    while True:
-        p = {**params, "limit": 50}
-        if cursor:
-            p["cursor"] = cursor
-        data = sgo_get("/events/", p)
-        events.extend(data.get("data", []))
-        cursor = data.get("nextCursor")
-        if not cursor:
-            break
-        time.sleep(7)  # stay well under 10 req/min between paginated calls
-    return events
+# ── ODDS API: CLOSING LINES ───────────────────────────────────────
 
-# ── TEAM ABBR FROM SGO EVENT ──────────────────────────────────────
+def _avg_point(bookmakers, market_key, outcome_name):
+    vals = []
+    for bk in bookmakers:
+        for mkt in bk.get("markets", []):
+            if mkt["key"] != market_key:
+                continue
+            for oc in mkt.get("outcomes", []):
+                if oc["name"] == outcome_name and oc.get("point") is not None:
+                    vals.append(oc["point"])
+    return round(sum(vals) / len(vals), 1) if vals else None
 
-def abbr(team_obj):
-    tid = team_obj.get("teamID", "")
-    if tid in SGO_TEAM_MAP:
-        return SGO_TEAM_MAP[tid]
-    # fallback: use short name
-    return team_obj.get("names", {}).get("short", tid[:3].upper())
+def _avg_price(bookmakers, market_key, outcome_name):
+    vals = []
+    for bk in bookmakers:
+        for mkt in bk.get("markets", []):
+            if mkt["key"] != market_key:
+                continue
+            for oc in mkt.get("outcomes", []):
+                if oc["name"] == outcome_name and oc.get("price") is not None:
+                    vals.append(oc["price"])
+    return round(sum(vals) / len(vals)) if vals else None
 
-# ── OUTCOME COMPUTATION ───────────────────────────────────────────
-
-def compute_outcomes(event):
+def fetch_odds_lines(date_str):
     """
-    SGO puts closeSpread, closeOverUnder, and score directly on the odd object
-    (top level, not nested in byBookmaker). Per the handling-odds guide:
-      oddObject.score         = final stat value for that market
-      oddObject.closeOverUnder = closing line for OU markets
-      oddObject.closeSpread    = closing line for spread markets
-    We use the consensus/book values. byBookmaker is NOT needed for grading.
+    Fetch closing lines from The Odds API historical endpoint.
+    Snapshot at 19:00 UTC (~2pm ET) captures pre-game closing lines.
+    Cost: 30 credits (3 markets x 1 region).
     """
-    odds = event.get("odds", {})
-
-    # --- Spread (home perspective) ---
-    sp_odd = odds.get("points-home-game-sp-home")
-    close_spread = None
-    if sp_odd:
-        for field in ("closeSpread", "closeBookSpread", "bookSpread"):
-            v = sp_odd.get(field)
-            if v is not None:
-                close_spread = float(v)
-                break
-
-    # --- Total: use the over odd; its score = total points scored ---
-    ou_odd = odds.get("points-all-game-ou-over")
-    close_total = None
-    total_scored = None
-    if ou_odd:
-        for field in ("closeOverUnder", "closeBookOverUnder", "bookOverUnder"):
-            v = ou_odd.get(field)
-            if v is not None:
-                close_total = float(v)
-                break
-        s = ou_odd.get("score")
-        if s is not None:
-            total_scored = float(s)
-
-    # --- Spread score: use home spread odd's score (= home_pts - away_pts + spread) ---
-    # Actually SGO score on a spread odd = the raw stat (home points for home-sp-home).
-    # We need home margin, which we already have from final scores passed in separately.
-    # So ATS grading uses close_spread + final scores (computed below in caller).
-
-    # O/U result — if SGO gave us total_scored via score field, use it
-    ou_result = None
-    if close_total is not None and total_scored is not None:
-        if total_scored > close_total:   ou_result = "over"
-        elif total_scored < close_total: ou_result = "under"
-        else:                            ou_result = "push"
-
-    return {
-        "close_spread":  close_spread,
-        "close_total":   close_total,
-        "total_scored":  total_scored,
-        "ou_result":     ou_result,
+    y, m, d = map(int, date_str.split("-"))
+    snapshot = datetime(y, m, d, 19, 0, 0, tzinfo=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    params = {
+        "apiKey":    ODDS_KEY,
+        "regions":   "us",
+        "markets":   "spreads,totals,h2h",
+        "oddsFormat":"american",
+        "date":      snapshot,
     }
+    try:
+        r = requests.get(
+            f"{ODDS_BASE}/historical/sports/{SPORT}/odds",
+            params=params, timeout=20
+        )
+        remaining = r.headers.get("x-requests-remaining", "?")
+        used      = r.headers.get("x-requests-used", "?")
+        print(f"  [Odds API] credits used={used} remaining={remaining}")
+        if r.status_code != 200:
+            print(f"  Odds API error {r.status_code}: {r.text[:150]}")
+            return {}
+        events = r.json().get("data", [])
+    except Exception as e:
+        print(f"  Odds API exception: {e}")
+        return {}
+
+    lines = {}
+    for ev in events:
+        away_full = ev.get("away_team", "")
+        home_full = ev.get("home_team", "")
+        away_abbr = next((k for k, v in TEAM_NAMES.items() if v == away_full), None)
+        home_abbr = next((k for k, v in TEAM_NAMES.items() if v == home_full), None)
+        if not away_abbr or not home_abbr:
+            continue
+        bks = ev.get("bookmakers", [])
+        lines[(away_abbr, home_abbr)] = {
+            "close_spread": _avg_point(bks, "spreads", home_full),
+            "close_total":  _avg_point(bks, "totals",  "Over"),
+            "home_ml":      _avg_price(bks, "h2h",     home_full),
+            "away_ml":      _avg_price(bks, "h2h",     away_full),
+        }
+    return lines
 
 # ── MAIN ──────────────────────────────────────────────────────────
 
@@ -318,85 +336,58 @@ def main():
     yesterday = (now_et - timedelta(days=1)).strftime("%Y-%m-%d")
     print(f"Processing games for {yesterday}")
 
-    # Fetch finalized NBA events from yesterday.
-    # Use explicit UTC datetime strings so West Coast games
-    # (which tip ~10:30pm ET = 3:30am UTC next day) are never missed.
-    yesterday_start_utc = (
-        datetime(*map(int, yesterday.split("-")), 5, 0, 0, tzinfo=timezone.utc)
-    ).strftime("%Y-%m-%dT%H:%M:%SZ")
-    today_end_utc = (
-        datetime(*map(int, yesterday.split("-")), 5, 0, 0, tzinfo=timezone.utc)
-        + timedelta(days=1)
-    ).strftime("%Y-%m-%dT%H:%M:%SZ")
-    events = fetch_all_events({
-        "leagueID":      "NBA",
-        "finalized":     "true",
-        "startsAfter":   yesterday_start_utc,
-        "startsBefore":  today_end_utc,
-        "oddID":         "points-home-game-sp-home,points-all-game-ou-over",
-        "expandResults": "true",
-    })
-
-    if not events:
+    # ── 1. Fetch yesterday's finalized games from BDL ─────────────
+    games = fetch_bdl_games(yesterday)
+    if not games:
         print(f"No finalized NBA games found for {yesterday}")
         return
+    print(f"Found {len(games)} finalized games")
 
-    print(f"Found {len(events)} finalized games")
+    # ── 2. Fetch closing lines from The Odds API ──────────────────
+    # One call covers all games for the date. Snapshot at 19:00 UTC
+    # captures pre-game closing lines (~2pm ET).
+    lines = fetch_odds_lines(yesterday)
+    print(f"Fetched closing lines for {len(lines)} matchups from The Odds API")
 
-    # Fetch last 21 days of games for fatigue rest calculation.
-    # No odds needed for history — just game results for schedule/rest data.
-    # Use UTC datetime strings (same as main fetch) so late West Coast games
-    # aren't dropped from team history due to UTC date boundary.
-    three_weeks_ago_utc = (
-        datetime(*map(int, yesterday.split("-")), 5, 0, 0, tzinfo=timezone.utc)
-        - timedelta(days=21)
-    ).strftime("%Y-%m-%dT%H:%M:%SZ")
-    yesterday_end_utc = yesterday_start_utc  # stop before yesterday's games
-    history_events = fetch_all_events({
-        "leagueID":     "NBA",
-        "finalized":    "true",
-        "startsAfter":  three_weeks_ago_utc,
-        "startsBefore": yesterday_end_utc,
-    })
-    print(f"Fetched {len(history_events)} history games for fatigue calc")
+    # ── 3. Fetch 21-day history for fatigue/rest calculation ──────
+    y, m, d  = map(int, yesterday.split("-"))
+    hist_end = yesterday  # exclusive: stop before yesterday's games
+    hist_start = (datetime(y, m, d) - timedelta(days=21)).strftime("%Y-%m-%d")
+    history_games = fetch_bdl_history(hist_start, hist_end)
+    print(f"Fetched {len(history_games)} history games for fatigue calc")
 
-    # Build a simple game history per team for rest calculation
-    # keyed by teamID → sorted list of {date, home_teamID, away_teamID, starts_at, home_score, away_score}
+    # Build team history keyed by team abbreviation.
+    # BDL provides a "datetime" UTC ISO string for tip time — used for rest/BTB calc.
     team_history = {}
-    for e in history_events:
-        home_tid = e["teams"]["home"]["teamID"]
-        away_tid = e["teams"]["away"]["teamID"]
-        starts   = e["status"].get("startsAt","")
-        results  = e.get("results", {})
-        h_pts    = results.get("home",{}).get("score") or results.get("points-home-game",{}).get("score")
-        a_pts    = results.get("away",{}).get("score") or results.get("points-away-game",{}).get("score")
-        rec = {"starts_at": starts, "home_teamID": home_tid, "away_teamID": away_tid,
-               "home_score": h_pts, "away_score": a_pts}
-        for tid in [home_tid, away_tid]:
-            team_history.setdefault(tid, []).append(rec)
+    for g in history_games:
+        home_abbr = g["home_team"]["abbreviation"]
+        away_abbr = g["visitor_team"]["abbreviation"]
+        # BDL returns a "datetime" field with the actual UTC tip time ISO string.
+        # Fall back to date + noon UTC only if missing.
+        starts_at = g.get("datetime") or (g["date"][:10] + "T17:00:00Z")
+        rec = {
+            "starts_at":  starts_at,
+            "home_abbr":  home_abbr,
+            "away_abbr":  away_abbr,
+            "home_score": g.get("home_team_score"),
+            "away_score": g.get("visitor_team_score"),
+        }
+        team_history.setdefault(home_abbr, []).append(rec)
+        team_history.setdefault(away_abbr, []).append(rec)
 
-    for tid in team_history:
-        team_history[tid].sort(key=lambda x: x["starts_at"])
+    for abbr_key in team_history:
+        team_history[abbr_key].sort(key=lambda x: x["starts_at"])
 
-    def calc_rest(team_id, target_date_str):
-        games = team_history.get(team_id, [])
-        if not games:
-            return {"days_rest": None, "prev_arena": None, "was_home_last": None,
-                    "games_in4": 1, "games_in6": 1, "prev_tip_hr": 19.5,
-                    "prev_late": False, "recent_altitude": False}
+    def calc_rest(team_abbr, target_date_str):
+        games_hist = team_history.get(team_abbr, [])
 
-        # Convert starts_at to ET calendar date for each game.
-        # Using UTC timestamps to compare calendar dates causes BTB misclassification:
-        # a 10:30pm ET tip = 3:30am UTC next day, so comparing against UTC midnight
-        # puts it on the wrong calendar date.
         def et_date(starts_at_str):
             dt = datetime.fromisoformat(starts_at_str.replace("Z", "+00:00"))
             return dt.astimezone(ET).date()
 
         target_date = datetime.strptime(target_date_str, "%Y-%m-%d").date()
+        played = [g for g in games_hist if et_date(g["starts_at"]) < target_date]
 
-        # Only include games played before target date (ET calendar)
-        played = [g for g in games if et_date(g["starts_at"]) < target_date]
         if not played:
             return {"days_rest": None, "prev_arena": None, "was_home_last": None,
                     "games_in4": 1, "games_in6": 1, "prev_tip_hr": 19.5,
@@ -404,21 +395,19 @@ def main():
 
         last = played[-1]
         last_et_date = et_date(last["starts_at"])
-        days_rest = (target_date - last_et_date).days - 1  # 0 = BTB, 1 = one day off, etc.
-        days_rest = max(0, days_rest)
+        days_rest = max(0, (target_date - last_et_date).days - 1)
 
-        was_home = last["home_teamID"] == team_id
-        home_abbr = SGO_TEAM_MAP.get(last["home_teamID"], "")
+        was_home  = last["home_abbr"] == team_abbr
+        home_abbr = last["home_abbr"]
 
-        # prev tip local hr — use ET conversion of the actual UTC game time
+        # Parse actual tip time from the BDL datetime field (UTC ISO string)
         last_dt = datetime.fromisoformat(last["starts_at"].replace("Z", "+00:00"))
         last_local = last_dt.astimezone(ZoneInfo(ARENAS.get(home_abbr, {}).get("tz_name", "America/New_York")))
         prev_tip_hr = last_local.hour + last_local.minute / 60
         if prev_tip_hr < 12:
-            prev_tip_hr += 24  # push into 0-48 scale (handles midnight crossover)
+            prev_tip_hr += 24  # push into 0-48 scale for midnight crossover
         prev_late = prev_tip_hr >= 21.5
 
-        # Density: count games in last N calendar days (ET) before target
         def count_in(n):
             cutoff = target_date - timedelta(days=n)
             return sum(1 for g in played if et_date(g["starts_at"]) >= cutoff)
@@ -426,11 +415,10 @@ def main():
         games_in3 = count_in(3)
         games_in5 = count_in(5)
 
-        # Altitude visit: did this team play in DEN or UTA in the last 4 calendar days?
         cutoff4 = target_date - timedelta(days=4)
         recent_altitude = any(
             et_date(g["starts_at"]) >= cutoff4
-            and SGO_TEAM_MAP.get(g["home_teamID"], "") in ALTITUDE_ARENAS
+            and g["home_abbr"] in ALTITUDE_ARENAS
             for g in played
         )
 
@@ -445,7 +433,7 @@ def main():
             "recent_altitude": recent_altitude,
         }
 
-    # Load existing results
+    # ── 4. Load existing results ───────────────────────────────────
     results_path = os.path.join(os.path.dirname(__file__), "..", "data", "results.json")
     results_path = os.path.normpath(results_path)
     try:
@@ -457,50 +445,26 @@ def main():
     existing_ids = {g["event_id"] for g in existing["games"]}
     new_games = []
 
-    for event in events:
-        eid = event["eventID"]
+    # ── 5. Process each game ───────────────────────────────────────
+    for game in games:
+        eid = str(game["id"])
         if eid in existing_ids:
             print(f"  Skip {eid} (already logged)")
             continue
 
-        home_obj = event["teams"]["home"]
-        away_obj = event["teams"]["away"]
-        home_tid = home_obj["teamID"]
-        away_tid = away_obj["teamID"]
-        home     = abbr(home_obj)
-        away     = abbr(away_obj)
+        home = game["home_team"]["abbreviation"]
+        away = game["visitor_team"]["abbreviation"]
 
-        # Final scores: SGO puts score on the odd object itself (per handling-odds guide).
-        # points-all-game-ou-over.score = total points scored (both teams combined).
-        # points-home-game-sp-home.score = home team points.
-        # Derive away score = total - home.
-        odds_raw = event.get("odds", {})
-        ou_odd   = odds_raw.get("points-all-game-ou-over", {})
-        sp_odd   = odds_raw.get("points-home-game-sp-home", {})
+        home_score = float(game.get("home_team_score") or 0)
+        away_score = float(game.get("visitor_team_score") or 0)
 
-        total_pts = ou_odd.get("score")
-        home_pts  = sp_odd.get("score")
-
-        # Fallback: try event.results if odd scores aren't populated
-        if total_pts is None or home_pts is None:
-            results_raw = event.get("results", {})
-            if home_pts is None:
-                home_pts = (results_raw.get("home", {}) or {}).get("score")
-            if total_pts is None:
-                away_pts_r = (results_raw.get("away", {}) or {}).get("score")
-                if home_pts is not None and away_pts_r is not None:
-                    total_pts = float(home_pts) + float(away_pts_r)
-
-        if total_pts is None or home_pts is None:
-            print(f"  Skip {away} @ {home}: no final score in odds or results")
+        if not home_score and not away_score:
+            print(f"  Skip {away} @ {home}: no final score from BDL")
             continue
 
-        home_score = float(home_pts)
-        away_score = float(total_pts) - home_score
-
         # Fatigue scores
-        hr = calc_rest(home_tid, yesterday)
-        ar = calc_rest(away_tid, yesterday)
+        hr = calc_rest(home, yesterday)
+        ar = calc_rest(away, yesterday)
 
         home_f = analyze_fatigue(home, True,  hr["days_rest"], hr["prev_arena"], home,
                                  hr["was_home_last"], hr["games_in4"], hr["games_in6"],
@@ -511,8 +475,7 @@ def main():
 
         away_fat = round(away_f["score"], 1)
         home_fat = round(home_f["score"], 1)
-        max_fat  = max(away_fat, home_fat)
-        diff     = round(away_fat - home_fat, 1)  # positive = away more fatigued = home edge
+        diff     = round(away_fat - home_fat, 1)
 
         # Only log if a v2.0 betting signal fires
         signals = get_betting_signals(away_f, home_f)
@@ -521,62 +484,56 @@ def main():
             continue
 
         signal_types = [s["type"] for s in signals]
-        has_spread = "spread" in signal_types
-        has_under  = "under"  in signal_types
+        has_spread  = "spread" in signal_types
+        has_under   = "under"  in signal_types
         signal_type = "both" if (has_spread and has_under) else signal_types[0]
 
-        # Edge direction (kept for display/legacy)
         if diff > 0:
-            edge = "HOME"
-            flagged_team = away
+            edge = "HOME"; flagged_team = away
         elif diff < 0:
-            edge = "AWAY"
-            flagged_team = home
+            edge = "AWAY"; flagged_team = home
         else:
-            edge = "EVEN"
-            flagged_team = ""
+            edge = "EVEN"; flagged_team = ""
 
-        # Both tired flag (raw, for display)
         both_tired = away_fat >= 5 and home_fat >= 5
 
-        # Outcomes
-        outcomes = compute_outcomes(event)
+        # Closing lines from Odds API
+        ln           = lines.get((away, home), {})
+        close_spread = ln.get("close_spread")
+        close_total  = ln.get("close_total")
+
+        if close_spread is None:
+            print(f"  Warning: no closing line from Odds API for {away} @ {home}")
 
         # ATS grading
         ats_result = None
-        close_spread = outcomes["close_spread"]
         if close_spread is not None:
-            margin = home_score - away_score
-            net = margin + close_spread
+            net = (home_score - away_score) + close_spread
             ats_result = "push" if net == 0 else ("home" if net > 0 else "away")
 
         # O/U grading
-        ou_result = outcomes["ou_result"]
-        close_total = outcomes["close_total"]
-        if ou_result is None and close_total is not None:
+        ou_result = None
+        if close_total is not None:
             total_final = home_score + away_score
             if total_final > close_total:   ou_result = "over"
             elif total_final < close_total: ou_result = "under"
             else:                           ou_result = "push"
 
-        # Spread bet result: bet is on AWAY team (AWAY EDGE signal)
+        # Spread bet result: bet is on AWAY team (fatigued road team + points)
         edge_ats = None
         if has_spread and ats_result:
             edge_ats = "WIN" if ats_result == "away" else (
                 "PUSH" if ats_result == "push" else "LOSS")
 
-        # Under bet result
         under_result = None
         if has_under and ou_result:
             under_result = "WIN" if ou_result == "under" else (
                 "PUSH" if ou_result == "push" else "LOSS")
 
-        starts_at = event["status"].get("startsAt","")
-
         rec = {
             "event_id":      eid,
             "date":          yesterday,
-            "starts_at":     starts_at,
+            "starts_at":     yesterday + "T20:00:00Z",  # BDL has no tip time
             "matchup":       f"{away} @ {home}",
             "away":          away,
             "home":          home,
