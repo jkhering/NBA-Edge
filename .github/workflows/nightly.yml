@@ -6,8 +6,7 @@ on:
     # GitHub cron is fixed UTC — does NOT auto-adjust for DST.
     # 14:00 UTC is safe year-round: all NBA games (latest ~1am ET) are
     # finalized well before this fires regardless of the season.
-    - cron: '0 9 * * *'
-    - cron: '0 11 * * *'
+    - cron: '0 14 * * *'
   workflow_dispatch:  # allows manual trigger from GitHub UI
 
 permissions:
