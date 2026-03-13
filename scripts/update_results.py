@@ -216,10 +216,18 @@ def get_betting_signals(away_f, home_f):
 
 # ── SGO FETCH HELPERS ─────────────────────────────────────────────
 
-def sgo_get(endpoint, params):
-    r = requests.get(f"{BASE}{endpoint}", headers=HEADERS, params=params, timeout=20)
-    r.raise_for_status()
-    return r.json()
+def sgo_get(endpoint, params, retries=4, backoff=15):
+    import time
+    for attempt in range(retries):
+        r = requests.get(f"{BASE}{endpoint}", headers=HEADERS, params=params, timeout=20)
+        if r.status_code == 429:
+            wait = backoff * (2 ** attempt)
+            print(f"  429 rate limit — waiting {wait}s before retry {attempt+1}/{retries}")
+            time.sleep(wait)
+            continue
+        r.raise_for_status()
+        return r.json()
+    raise Exception(f"SGO API rate limit exceeded after {retries} retries for {endpoint}")
 
 def fetch_all_events(params):
     events = []
