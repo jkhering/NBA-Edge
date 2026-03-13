@@ -30,7 +30,8 @@ jobs:
 
       - name: Run results updater
         env:
-          SGO_API_KEY: ${{ secrets.SGO_API_KEY }}
+          BDL_API_KEY:  ${{ secrets.BDL_API_KEY }}
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
         run: python scripts/update_results.py
 
       - name: Commit updated results
