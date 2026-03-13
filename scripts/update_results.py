@@ -230,6 +230,7 @@ def sgo_get(endpoint, params, retries=4, backoff=15):
     raise Exception(f"SGO API rate limit exceeded after {retries} retries for {endpoint}")
 
 def fetch_all_events(params):
+    import time
     events = []
     cursor = None
     while True:
@@ -241,6 +242,7 @@ def fetch_all_events(params):
         cursor = data.get("nextCursor")
         if not cursor:
             break
+        time.sleep(7)  # stay well under 10 req/min between paginated calls
     return events
 
 # ── TEAM ABBR FROM SGO EVENT ──────────────────────────────────────
