@@ -81,34 +81,7 @@
       "edge_ats": "WIN",
       "under_result": null
     },
-    {
-      "event_id": "F76mNhUFs5AU0GHsT2CZ",
-      "date": "2026-03-13",
-      "starts_at": "2026-03-13T23:30:00.000Z",
-      "matchup": "CLE @ DAL",
-      "away": "CLE",
-      "home": "DAL",
-      "away_score": 138,
-      "home_score": 105,
-      "away_fatigue": 2.0,
-      "home_fatigue": 6.0,
-      "away_scenario": null,
-      "home_scenario": "C",
-      "away_detail": "Road 1d rest ",
-      "home_detail": "BTB away\u2192home \u00b7 420mi",
-      "fatigue_diff": 4.0,
-      "edge": "AWAY",
-      "flagged_team": "DAL",
-      "both_tired": false,
-      "signal_type": "spread",
-      "close_spread": 13.5,
-      "close_total": 236.5,
-      "ats_result": "away",
-      "ou_result": "over",
-      "edge_ats": "WIN",
-      "under_result": null
-    }
-  ],
+    ],
   "meta": {
     "last_updated": "2026-03-14 10:24 ET",
     "total_flagged": 5
