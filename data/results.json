@@ -80,10 +80,10 @@
       "ou_result": "over",
       "edge_ats": "WIN",
       "under_result": null
-    },
+    }
     ],
   "meta": {
     "last_updated": "2026-03-14 10:24 ET",
-    "total_flagged": 5
+    "total_flagged": 3
   }
 }
