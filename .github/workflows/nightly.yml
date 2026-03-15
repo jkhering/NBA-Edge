@@ -2,11 +2,11 @@ name: Nightly Results Update
 
 on:
   schedule:
-    # 14:00 UTC = 9:00 AM EST (Nov–Mar) / 10:00 AM EDT (Mar–Nov)
+    # 12:00 UTC = 9:00 AM EST (Nov–Mar) / 8:00 AM EDT (Mar–Nov)
     # GitHub cron is fixed UTC — does NOT auto-adjust for DST.
-    # 14:00 UTC is safe year-round: all NBA games (latest ~1am ET) are
+    # 12:00 UTC is safe year-round: all NBA games (latest ~1am ET) are
     # finalized well before this fires regardless of the season.
-    - cron: '0 14 * * *'
+    - cron: '0 12 * * *'
   workflow_dispatch:  # allows manual trigger from GitHub UI
 
 permissions:
