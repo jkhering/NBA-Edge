@@ -80,10 +80,37 @@
       "ou_result": "over",
       "edge_ats": "WIN",
       "under_result": null
+    },
+    {
+      "event_id": "GGsVeY5mxwjGwQWspqGf",
+      "date": "2026-03-14",
+      "starts_at": "2026-03-15T02:30:00.000Z",
+      "matchup": "SAC @ LAC",
+      "away": "SAC",
+      "home": "LAC",
+      "away_score": 118,
+      "home_score": 109,
+      "away_fatigue": 0,
+      "home_fatigue": 4.0,
+      "away_scenario": null,
+      "home_scenario": "home-home",
+      "away_detail": "Road, full rest",
+      "home_detail": "Home BTB",
+      "fatigue_diff": 4.0,
+      "edge": "AWAY",
+      "flagged_team": "LAC",
+      "both_tired": false,
+      "signal_type": "spread",
+      "close_spread": -14.0,
+      "close_total": 231.5,
+      "ats_result": "away",
+      "ou_result": "under",
+      "edge_ats": "WIN",
+      "under_result": null
     }
-    ],
+  ],
   "meta": {
-    "last_updated": "2026-03-14 10:24 ET",
-    "total_flagged": 3
+    "last_updated": "2026-03-15 08:52 ET",
+    "total_flagged": 4
   }
 }
